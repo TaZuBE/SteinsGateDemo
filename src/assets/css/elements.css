@@ -1,0 +1,39 @@
+
+
+button {
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px
+}
+
+button:hover {
+  cursor: pointer;
+}
+
+textarea, input {
+  background: transparent;
+  padding: 10px;
+  border-radius: 6px;
+  outline: none;
+  border: none;
+  transition: filter 150ms;
+}
+
+textarea:hover, input:hover {
+  filter: brightness(1.1);
+}
+
+textarea:active, input:active {
+  filter: brightness(1.06) !important;
+}
+
+textarea:focus, input:focus {
+  filter: brightness(1.2);
+}
+
+blockquote {
+  background-color: #111;
+  border-radius: 6px;
+}

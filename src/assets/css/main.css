@@ -1,0 +1,34 @@
+@import url('./keyframes.css');
+@import url('./elements.css');
+@import url('./classes.css');
+@import url('./markdown.css');
+
+
+* {
+  font-family: Microsoft YaHei;
+  color: white;
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px; /* 圆角 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.6);
+  border-radius: 10px; /* 圆角 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.8);
+}
+
+::-webkit-scrollbar-corner {
+  background: rgba(0, 0, 0, 0.1);
+}

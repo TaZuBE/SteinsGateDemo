@@ -1,0 +1,8 @@
+
+
+.hoverbright {
+  transition: filter 200ms;
+}
+.hoverbright:hover {
+  filter: brightness(1.2);
+}
