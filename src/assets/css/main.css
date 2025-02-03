@@ -3,6 +3,9 @@
 @import url('./classes.css');
 @import url('./markdown.css');
 
+html {
+  overflow: hidden;
+}
 
 * {
   font-family: Microsoft YaHei;

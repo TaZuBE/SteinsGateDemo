@@ -5,6 +5,13 @@ module.exports = {
   packagerConfig: {
     asar: true,
     dir: 'dist',
+    ignore: [
+      /^\/(?!dist|electron|package\.json)/, // 只保留 dist、electron 目录和 package.json
+      /node_modules/, 
+      /\.git/,
+      /src/,
+      /\.vite/
+    ],
   },
   rebuildConfig: {},
   makers: [

@@ -23,6 +23,9 @@ export class Vector {
 			this.y = a2!
 		}
 	}
+	static randomUnit() {
+		return new Vector(Math.random(), Math.random()).normalize()
+	}
 	add(v: Vector) {
 		return new Vector(this.x + v.x, this.y + v.y)
 	}
@@ -45,7 +48,7 @@ export class Vector {
 		return this.x === 0 && this.y === 0
 	}
 	normalize() {
-		return this.div(this.len())
+		return this.len() === 0 ? new Vector() : this.div(this.len())
 	}
 	to(v: Vector) {
 		return v.sub(this)

@@ -13,7 +13,7 @@ function drawBezier() {
   const ctx = cvs.value.getContext('2d')
   if (!ctx) return
 
-  const ost = new SmoothTransition()
+  const ost = new RoundTransition()
   const cst = new SmoothTransition()
   ost.duration = cst.duration = 500
   ost.value = cst.value = 400
@@ -38,6 +38,11 @@ function drawBezier() {
   setTimeout(() => {
     cst.value = 800
   }, 600)
+  // let count = 1
+  // setInterval(() => {
+  //   ost.value = 400
+  //   // count == 100
+  // }, 100)
 }
 
 </script>

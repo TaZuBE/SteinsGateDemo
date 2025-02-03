@@ -237,9 +237,13 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
       closing === 0 ? { 2: Math.min(Math.max(s, low), high) } :
         closing === 1 ? { 2: bottom - top } : { 2: 0 }
   }
-  if (closing) {
-    transitionable.value = true
-  }
+  // panel恢复显示后如果较大幅度更新位置，会造成卡顿
+  // 原因：css transition如果更新最终值会重置duration
+  // if (closing) {
+  //   transitionable.value = true
+  // }
+  // 备用方案：恢复显示时不过渡
+  transitionable.value = closing !== 0
   nextTick(resize)
   // resize()
 }
@@ -283,12 +287,12 @@ const onMousedown = (e: MouseEvent) => {
 <template>
   <div ref="container" class="full relative">
     <div ref="d1" class="absolute overflow-hidden"
-      :class="{ 'transition-[width,height] transition-duration-100': transitionable }"
+      :class="{ 'transition-[width,height] transition-duration-150': transitionable }"
       @transitionend="transitionable = false">
       <slot name="1"></slot>
     </div>
     <div ref="d2" class="absolute overflow-hidden"
-      :class="{ 'transition-[width,height] transition-duration-100': transitionable }">
+      :class="{ 'transition-[width,height] transition-duration-150': transitionable }">
       <slot name="2"></slot>
     </div>
     <div ref="handle" class="absolute" @mousedown="onMousedown"></div>

@@ -10,15 +10,16 @@ import ManageFormulaNode from './ManageFormulaNode.vue'
 import AddEquation from './AddEquation.vue'
 import ManageEquation from './ManageEquation.vue'
 import FunctionButton from './FunctionButton.vue'
-import Relaxing from './Relaxing.vue'
+import ControlPanel from './ControlPanel.vue'
 
 // store
 const store = useFormulaStore()
 watch(store.state, () => {
   Draw()
 })
-store.state.zoon.ontransition((v: number, t: number, dv: number) => {
-  store.state.OPos.doAdd(CVS.wheel.cursor2OPos.mul(dv))
+store.view.zoon.ontransition((v: number, t: number, dv: number) => {
+  if (Number.isNaN(CVS.wheel.cursor2OPos.x)) return
+  store.view.OPos.doAdd(CVS.wheel.cursor2OPos.mul(dv))
   Draw()
 })
 
@@ -26,9 +27,9 @@ store.state.zoon.ontransition((v: number, t: number, dv: number) => {
 const
   NODE = {
     ORIGINAL_RADIUS: 30,
-    RADIUS: (): number => NODE.ORIGINAL_RADIUS * store.state.zoon.value,
+    RADIUS: (): number => NODE.ORIGINAL_RADIUS * store.view.zoon.value,
     ORIGINAL_FIXED: 5,
-    FIXED: (): number => NODE.ORIGINAL_FIXED * store.state.zoon.value,
+    FIXED: (): number => NODE.ORIGINAL_FIXED * store.view.zoon.value,
   },
   LINE = {
     WIDTH: 1.5,
@@ -36,7 +37,7 @@ const
   },
   ARROW = {
     ORIGINAL_RADIUS: 10,
-    LENGTH: (): number => ARROW.ORIGINAL_RADIUS * store.state.zoon.value,
+    LENGTH: (): number => ARROW.ORIGINAL_RADIUS * store.view.zoon.value,
     ANGLE: Math.PI / 6,
   },
   ZOON = {
@@ -122,7 +123,6 @@ const resizeCanvas = () => {
   nextTick(painter.draw)
 }
 function lineStyle(a: FormulaNode, b: FormulaNode) {
-  // console.log(...store.toView(a.pos).tuple(), ...store.toView(b.pos).tuple(), store.state.OPos.tuple())
   const color = canvas.value!.getContext('2d')!.createLinearGradient(...store.toView(a.pos).tuple(), ...store.toView(b.pos).tuple())
   color.addColorStop(0, `rgba(78, 197, 241, ${a.style.attrs.opacity.value})`)
   color.addColorStop(1, `rgba(78, 197, 241, ${b.style.attrs.opacity.value})`)
@@ -147,7 +147,7 @@ const CVS = {
     const view = {
       onMousemove(e: MouseEvent) {
         CVS.mousedown.isClick = false
-        store.state.OPos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos))
+        store.view.OPos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos))
         CVS.mousedown.fPos = new Vector(e.clientX, e.clientY)
         Draw()
       },
@@ -171,7 +171,7 @@ const CVS = {
     const node = {
       onMousemove(e: MouseEvent) {
         CVS.mousedown.isClick = false
-        targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.state.zoon.value))
+        targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.view.zoon.value))
         CVS.mousedown.fPos = new Vector(e.clientX, e.clientY)
         if (targetNode.pos.distance(CVS.menu.node.pos) > 100 && CVS.menu.node.on) {
           CVS.menu.hide()
@@ -215,10 +215,10 @@ const CVS = {
   },
   onWheel(e: WheelEvent) {
     const cursorPos = new Vector(e.clientX - canvas.value!.getBoundingClientRect().left, e.clientY - canvas.value!.getBoundingClientRect().top)
-    CVS.wheel.cursor2OPos = cursorPos.to(store.state.OPos).div(store.state.zoon.value)
+    CVS.wheel.cursor2OPos = cursorPos.to(store.view.OPos).div(store.view.zoon.value)
     const zooned = (1 - e.deltaY / 1000) * ZOON.SPEED
-    const newZoon = Math.max(Math.min(store.state.zoon.endValue * zooned, ZOON.MAX), ZOON.MIN)
-    store.state.zoon.value = newZoon
+    const newZoon = Math.max(Math.min(store.view.zoon.endValue * zooned, ZOON.MAX), ZOON.MIN)
+    store.view.zoon.value = newZoon
   },
   menu: reactive({
     node: {
@@ -362,13 +362,14 @@ const CVS = {
             for (const n of store.state.nodes) {
               n.pos.set(gather)
             }
+            store.repel()
             CVS.menu.hide()
           }
         },
         // 7
         {
-          text: '松弛节点',
-          shortcut: 'R',
+          text: '控制面板',
+          shortcut: 'C',
           extra: {
             pos: new Vector(),
             on: false,
@@ -541,7 +542,7 @@ const painter = {
   drawFormula(f: FormulaNode) {
     if (!ctx) return;
     const text = f.formula.string()
-    const presize = 20 * store.state.zoon.value * f.style.attrs.zoon.value
+    const presize = 20 * store.view.zoon.value * f.style.attrs.zoon.value
     ctx.font = `${presize}px Arial`
     const textWidth = ctx.measureText(text).width
     ctx.font = `${presize * Math.min((NODE.RADIUS() * f.style.attrs.zoon.value - NODE.FIXED() * 0.5) * 2 / textWidth, 1)}px Arial`
@@ -550,18 +551,18 @@ const painter = {
     ctx.textBaseline = 'middle'
     ctx.fillText(text, ...store.toView(f.pos).tuple())
   },
-  drawGrid: () => {
+  drawGrid() {
     if (!ctx) return
     for (let i = store.toView(new Vector(down(store.toSpace(new Vector(0, 0)).x, GRID.GAP), 0)).x;
       i < canvasNaturalSize.value.width;
-      i += GRID.GAP * store.state.zoon.value) {
+      i += GRID.GAP * store.view.zoon.value) {
       for (let j = store.toView(new Vector(0, down(store.toSpace(new Vector(0, 0)).y, GRID.GAP))).y;
         j < canvasNaturalSize.value.height;
-        j += GRID.GAP * store.state.zoon.value) {
-        const r = 5 * store.state.zoon.value
+        j += GRID.GAP * store.view.zoon.value) {
+        const r = 5 * store.view.zoon.value
         ctx.beginPath()
         ctx.strokeStyle = GRID.COLOR
-        ctx.lineWidth = 1 + store.state.zoon.value * 0.5
+        ctx.lineWidth = 1 + store.view.zoon.value * 0.5
         ctx.moveTo(i - r, j)
         ctx.lineTo(i + r, j)
         ctx.moveTo(i, j - r)
@@ -571,23 +572,42 @@ const painter = {
       }
     }
   },
+  drawBarycenter() {
+    if (!ctx) return
+    const pos = store.toView(store.barycenter())
+    ctx.strokeStyle = '#5c5'
+    const r = 5 * store.view.zoon.value, c = 3
+    for (let i = 0; i < c; i++) {
+      ctx.beginPath()
+      ctx.arc(...pos.tuple(), r * (i + 1), 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.closePath()
+    }
+  },
 
   // 最终作画
   draw: () => {
     if (!ctx) return
     ctx.clearRect(0, 0, canvasNaturalSize.value.width, canvasNaturalSize.value.height)
-    painter.drawGrid()
+    if (store.control.grid) {
+      painter.drawGrid()
+    }
     const nodes = store.state.nodes
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        if (nodes[i].style.type !== NodeStyle.hidden && nodes[j].style.type !== NodeStyle.hidden) {
-          painter.drawSide(nodes[i], nodes[j])
+    if (store.control.side) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (nodes[i].style.type !== NodeStyle.hidden && nodes[j].style.type !== NodeStyle.hidden) {
+            painter.drawSide(nodes[i], nodes[j])
+          }
         }
       }
     }
     for (let i = 0; i < nodes.length; i++) {
       painter.drawBg(nodes[i])
       painter.drawFormula(nodes[i])
+    }
+    if (store.control.barycenter) {
+      painter.drawBarycenter()
     }
   }
 }
@@ -600,8 +620,6 @@ function Draw() {
     requestAnimationFrame(() => drawDone = false)
   }
 }
-
-
 
 share(Draw)
 
@@ -617,7 +635,7 @@ share(Draw)
     left: `${store.toView(CVS.menu.node.pos).x}px`,
     top: `${store.toView(CVS.menu.node.pos).y}px`,
     opacity: `${CVS.menu.node.on ? 100 : 0}%`,
-    transform: `scale(${store.state.zoon.value})`,
+    transform: `scale(${store.view.zoon.value})`,
     pointerEvents: CVS.menu.node.on ? 'all' : 'none',
   }" @wheel="CVS.onWheel">
     <div class="menu-inner menu" :style="{
@@ -643,7 +661,7 @@ share(Draw)
     left: `${store.toView(CVS.menu.view.pos).x}px`,
     top: `${store.toView(CVS.menu.view.pos).y}px`,
     opacity: `${CVS.menu.view.on ? 100 : 0}%`,
-    transform: `scale(${store.state.zoon.value})`,
+    transform: `scale(${store.view.zoon.value})`,
     pointerEvents: CVS.menu.view.on ? 'all' : 'none',
   }" @wheel="CVS.onWheel">
     <div class="menu-inner menu" :style="{
@@ -677,10 +695,11 @@ share(Draw)
   <ManageEquation :display="CVS.menu.view.ctxs[5].extra.display" @close="CVS.menu.view.ctxs[5].extra.back">
   </ManageEquation>
 
-  <Relaxing v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:on="CVS.menu.view.ctxs[7].extra.on" :wheel="CVS.onWheel"></Relaxing>
+  <ControlPanel v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:on="CVS.menu.view.ctxs[7].extra.on"
+    v-model:store.control="store.control" :wheel="CVS.onWheel"></ControlPanel>
 
   <FunctionButton></FunctionButton>
-  
+
 </template>
 
 <style lang="scss" scoped>

@@ -123,12 +123,15 @@ export class RoundTransition {
             if (!o._animationId) {
               o._duration = o.duration
               o._smoothFunc = o.timingFunction
-              o._startTime = o._lastTime = Date.now()
+              o._startTime = o._oStartTime = o._lastTime = Date.now()
               o._startValue = o._lastValue = o.value
               o._animationId = requestAnimationFrame(o._transition.bind(o))
             } else {
               o._duration = o.duration - Date.now() + o._oStartTime
-              o._smoothFunc = cubicBezier(0.4, 0.4 * o._d / (v - o.value === 0 ? 0.0001 : v - o.value) * o._duration, 0.8, 1)
+              const dx = 0.4
+              const dy = dx * o._d / (v - o.value === 0 ? 0.0001 : v - o.value) * o._duration
+              const scale = dy >= 0.9 ? 0.9 / dy : 1
+              o._smoothFunc = cubicBezier(dx * scale, dy * scale, 0.8, 1)
               o._startTime = Date.now()
               o._startValue = o.value
             }
@@ -147,12 +150,12 @@ export class RoundTransition {
     this.value = this._startValue + this._smoothFunc(
       (Date.now() - this._startTime) / this._duration
     ) * (this._endValue - this._startValue)
-    this._d = (this.value - lastValue) / (Date.now() - this._lastTime)
+    this._d = (this.value - lastValue) / Math.max(Date.now() - this._lastTime, 1)
     this._ontransition(this.value, Date.now() - this._oStartTime, this.value - this._lastValue, Date.now() - this._lastTime)
     this._lastTime = Date.now()
     this._lastValue = this.value
 
-    if (this._startTime + this._duration < Date.now()) {
+    if (this._startTime + this._duration < Date.now() || this._duration < 0) {
       this.value = this._endValue
       this._animationId = null
     } else {
@@ -213,14 +216,17 @@ export class SmoothTransition {
             o.value = v
           } else {
             if (!o._animationId) {
-              o._startTime = o._lastTime = Date.now()
+              o._startTime = o._oStartTime = o._lastTime = Date.now()
               o._startValue = o._lastValue = o.value
               o._smoothFunc = o.timingFunction
               o._animationId = requestAnimationFrame(o._transition.bind(o))
             } else {
               o._startTime = Date.now()
               o._startValue = o.value
-              o._smoothFunc = cubicBezier(0.4, 0.4 * o._d / (v - o.value === 0 ? 0.0001 : v - o.value) * o.duration, 0.8, 1)
+              const dx = 0.4
+              const dy = dx * o._d / (v - o.value === 0 ? 0.0001 : v - o.value) * o.duration
+              const scale = dy >= 0.9 ? 0.9 / dy : 1
+              o._smoothFunc = cubicBezier(dx * scale, dy * scale, 0.8, 1)
             }
             o._endValue = v
           }
@@ -237,7 +243,7 @@ export class SmoothTransition {
     this.value = this._startValue + this._smoothFunc(
       (Date.now() - this._startTime) / this.duration
     ) * (this._endValue - this._startValue)
-    this._d = (this.value - lastValue) / (Date.now() - this._lastTime)
+    this._d = (this.value - lastValue) / Math.max(Date.now() - this._lastTime, 1)
     this._ontransition(this.value, Date.now() - this._oStartTime, this.value - this._lastValue, Date.now() - this._lastTime)
     this._lastTime = Date.now()
     this._lastValue = this.value

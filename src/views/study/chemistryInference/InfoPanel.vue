@@ -26,7 +26,7 @@ watch(store.state, () => {
 
 <template>
   <div class="full absolute bg-#2e2e2e p-[10px_14px] font-size-1.1em">
-    <div class="full relative">
+    <div class="full relative whitespace-nowrap">
       <Transition name="info-panel" mode="out-in">
         <div v-if="currentNode && circle === 0" class="full absolute">
           <h1 class="mt-6px pb-10px border-0px border-#ccc border-solid border-b">化学式属性：</h1>

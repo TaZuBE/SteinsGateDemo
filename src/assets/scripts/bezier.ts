@@ -32,7 +32,7 @@ export function cubicBezier(_p1: Vector | number, _p2: Vector | number, _p3?: nu
     for (let i = 0; i < 8; i++) {
       const fx = ax * s ** 3 + bx * s ** 2 + cx * s - t
       const dfx = 3 * ax * s ** 2 + 2 * bx * s + cx
-      s -= fx / dfx
+      s -= fx / (dfx === 0 ? 1 : dfx)
       s = Math.max(0, Math.min(1, s))
     }
     return ay * s ** 3 + by * s ** 2 + cy * s

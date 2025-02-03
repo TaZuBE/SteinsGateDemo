@@ -1,6 +1,6 @@
 import { reactive } from "vue"
 import { Vector, type VectorDataType } from "@/assets/scripts/data"
-import { deepEqual, deepClone} from "@/assets/scripts/algorithm"
+import { deepEqual, deepClone } from "@/assets/scripts/algorithm"
 import Transition, { SmoothTransition, TransitionColor } from "@/assets/scripts/transition"
 import { ease, easeout } from "@/assets/scripts/timingFunctions"
 import { cubicBezier } from "@/assets/scripts/bezier"
@@ -687,12 +687,7 @@ function getNode(f: Formula) {
 }
 
 
-const state = reactive<{
-  equations: Equation[],
-  nodes: FormulaNode[],
-  OPos: Vector,
-  zoon: Transition,
-}>({
+const state = reactive({
   equations: [
     Equation.parse('CO2+H2O=H2CO3'),
     Equation.parse('H2CO3=CO2+H2O'),
@@ -707,8 +702,16 @@ const state = reactive<{
     new FormulaNode(Formula.parse('H2O')),
     new FormulaNode(Formula.parse('H2CO3')),
   ],
+})
+const view = reactive({
   OPos: new Vector(),
   zoon: new SmoothTransition(1, 150, easeout)
+})
+const control = reactive({
+  grid: true,
+  side: true,
+  barycenter: false,
+  repulsion: true,
 })
 
 
@@ -772,8 +775,8 @@ function formData() {
     equations: state.equations.map(eq => eq.data()),
     nodes: state.nodes.map(v => v.data()),
     view: {
-      OPos: state.OPos.data(),
-      zoon: state.zoon.value,
+      OPos: view.OPos.data(),
+      zoon: view.zoon.value,
     }
   }
 }
@@ -783,21 +786,14 @@ function restoreJson(json: string) {
 function restoreData(data: DataType) {
   state.equations = data.equations.map(e => Equation.restore(e))
   state.nodes = data.nodes.map(n => FormulaNode.restore(n))
-  state.OPos.set(Vector.restore(data.view.OPos))
-  state.zoon.transitionable = false
-  state.zoon.value = data.view.zoon
-  state.zoon.transitionable = true
+  view.OPos.set(Vector.restore(data.view.OPos))
+  view.zoon.transitionable = false
+  view.zoon.value = data.view.zoon
+  view.zoon.transitionable = true
   analyzeEquation()
 }
 function saveCopyData() {
   copy = deepClone(formData())
-}
-
-function toView(v: Vector) {
-  return v.mul(state.zoon.value).add(state.OPos)
-}
-function toSpace(v: Vector) {
-  return v.sub(state.OPos).div(state.zoon.value)
 }
 function fromCopy() {
   if (copy === null) {
@@ -806,9 +802,25 @@ function fromCopy() {
   restoreData(copy)
 }
 
+function toView(v: Vector) {
+  return v.mul(view.zoon.value).add(view.OPos)
+}
+function toSpace(v: Vector) {
+  return v.sub(view.OPos).div(view.zoon.value)
+}
+function barycenter() {
+  return new Vector(
+    state.nodes.reduce((accumulator, n) => accumulator + n.pos.x, 0),
+    state.nodes.reduce((accumulator, n) => accumulator + n.pos.y, 0)
+  ).div(state.nodes.length)
+}
+function radius() {
+  const center = barycenter()
+  return state.nodes.reduce((accumulator, n) => accumulator + center.to(n.pos).len(), 0) / state.nodes.length
+}
+
 let repeling = false
 function _repel() {
-  console.log(1)
   repeling = true
   const nodes = state.nodes.filter(n => n.style.type !== NodeStyle.hidden)
   const MAX_DISTANCE = 120
@@ -838,20 +850,26 @@ function _repel() {
     }
   }
   Draw()
-  if (!over) {
+  if (!over && control.repulsion) {
     requestAnimationFrame(_repel)
   } else {
     repeling = false
   }
 }
 function repel() {
-  if (!repeling) {
+  if (!repeling && control.repulsion) {
     _repel()
   }
 }
+function scale(ratio: number, origin: Vector = barycenter()) {
+  state.nodes.map(n => n.pos.doAdd(origin.to(n.pos).mul(ratio - 1)))
+}
+
 export function useFormulaStore() {
   return {
     state,
+    view,
+    control,
     toStorage,
     fromStorage,
 
@@ -868,8 +886,12 @@ export function useFormulaStore() {
 
     toView,
     toSpace,
+    barycenter,
+    radius,
 
+    Draw,
     repel,
+    scale,
   }
 }
 // localStorage.clear()
