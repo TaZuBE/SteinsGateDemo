@@ -5,10 +5,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/electron/main.cjs",
+  "main": "dist/electron/main.js",
   "scripts": {
     "dev": "vite",
-    "electron": "tsc -p electron/tsconfig.json && powershell -Command \"Remove-Item -Path 'dist/electron/main.cjs' -ErrorAction SilentlyContinue\" && powershell -Command \"Rename-Item -Path 'dist/electron/main.js' -NewName 'main.cjs' -Force\" && electron .",
+    "electron": "npm run build-electron && electron .",
+    "build-electron": "tsc -p electron/tsconfig.json",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",

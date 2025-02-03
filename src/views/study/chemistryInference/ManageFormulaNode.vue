@@ -158,7 +158,7 @@ function afterAddFormula() {
           class="w-1000px h-700px p-[10px_20px] bg-#333 rounded-xl grid grid-rows-[40px_1fr]"
           @click="e => e.stopPropagation()">
           <h2 class="flex-center mt-5px">管理化学式</h2>
-          <Panel :default-size="{ 1: 180 }" :p1min="100" :p2min="300" :gap="10">
+          <Panel :default-size="{ 1: 220 }" :p1min="120" :p2min="300" :gap="10">
             <template #1>
               <div class="full grid grid-rows-[25px_1fr] gap-10px">
                 <div class="mx-6px grid grid-cols-[1fr_40px] gap-6px">

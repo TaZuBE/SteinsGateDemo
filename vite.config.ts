@@ -13,6 +13,7 @@ export default defineConfig({
     vueJsx(),
     UnoCSS(),
   ],
+  base: './',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))

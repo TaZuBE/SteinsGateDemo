@@ -1,10 +1,13 @@
-
 export function down(x: number, gap: number = 1) {
   return Math.floor(x / gap) * gap;
 }
 
 export function up(x: number, gap: number = 1) {
   return Math.ceil(x / gap) * gap;
+}
+
+export function ease(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
 
 export function deepEqual(a: any, b: any) {
@@ -37,20 +40,4 @@ export function deepClone<T>(obj: T): T {
     }
   }
   return clonedObj as T
-}
-
-export function factorial(n: number) {
-  let res = 1
-  for (let i = 2; i <= n; i++) {
-    res *= i
-  }
-  return res
-}
-
-export function A(n: number, count: number) {
-  return factorial(n) / factorial(n - count)
-}
-
-export function C(n: number, count: number) {
-  return factorial(n) / (factorial(n - count) * factorial(count))
 }

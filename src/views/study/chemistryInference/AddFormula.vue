@@ -4,6 +4,7 @@ import { Formula, FormulaNode, useFormulaStore } from './data'
 import Panel from '@/components/Panel.vue'
 import { useToast } from 'vue-toastification'
 import { marked } from 'marked'
+import { Vector } from '@/assets/scripts/data'
 
 const toast = useToast()
 const store = useFormulaStore()
@@ -126,7 +127,7 @@ function confirm() {
     toast.success('成功添加化学式')
     const f = Formula.parse(formulaText.value)
     f.description = descriptionText.value
-    store.addNode(new FormulaNode(f))
+    store.addNode(new FormulaNode(f, store.toSpace(new Vector(100, 100))))
     emit('close')
   }
 }

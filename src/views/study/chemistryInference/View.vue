@@ -10,19 +10,25 @@ import ManageFormulaNode from './ManageFormulaNode.vue'
 import AddEquation from './AddEquation.vue'
 import ManageEquation from './ManageEquation.vue'
 import FunctionButton from './FunctionButton.vue'
+import Relaxing from './Relaxing.vue'
 
 // store
 const store = useFormulaStore()
-watch(store.state, () => Draw())
+watch(store.state, () => {
+  Draw()
+})
+store.state.zoon.ontransition((v: number, t: number, dv: number) => {
+  store.state.OPos.doAdd(CVS.wheel.cursor2OPos.mul(dv))
+  Draw()
+})
 
 // constants
 const
   NODE = {
     ORIGINAL_RADIUS: 30,
-    RADIUS: computed((): number => NODE.ORIGINAL_RADIUS * store.state.zoon),
+    RADIUS: (): number => NODE.ORIGINAL_RADIUS * store.state.zoon.value,
     ORIGINAL_FIXED: 5,
-    FIXED: computed((): number => NODE.ORIGINAL_FIXED * store.state.zoon),
-    COLOR: 'rgba(4, 236, 193, 0.76)',
+    FIXED: (): number => NODE.ORIGINAL_FIXED * store.state.zoon.value,
   },
   LINE = {
     WIDTH: 1.5,
@@ -30,7 +36,7 @@ const
   },
   ARROW = {
     ORIGINAL_RADIUS: 10,
-    LENGTH: computed((): number => ARROW.ORIGINAL_RADIUS * store.state.zoon),
+    LENGTH: (): number => ARROW.ORIGINAL_RADIUS * store.state.zoon.value,
     ANGLE: Math.PI / 6,
   },
   ZOON = {
@@ -57,11 +63,11 @@ const props = defineProps({
 
 // watch
 const watchWidth = watch(() => props.width, (newVal: number) => {
-  canvasCssSize.value.width = newVal
+  canvasCssSize.width = newVal
   resizeCanvas()
 })
 const watchHeight = watch(() => props.height, (newVal: number) => {
-  canvasCssSize.value.height = newVal
+  canvasCssSize.height = newVal
   resizeCanvas()
 })
 
@@ -69,7 +75,7 @@ const watchHeight = watch(() => props.height, (newVal: number) => {
 onMounted(() => {
   window.addEventListener('keydown', windowKeydown)
   window.addEventListener('unload', finish)
-  repel(store.state.nodes)
+  store.repel()
 })
 function finish() {
   window.removeEventListener('unload', finish)
@@ -94,12 +100,12 @@ function windowKeydown(e: KeyboardEvent) {
 // canvas
 const canvas = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
-const canvasCssSize = ref({ width: 0, height: 0 })
+const canvasCssSize = reactive({ width: 0, height: 0 })
 const canvasNaturalSize = computed({
   get: () => {
     return {
-      width: canvasCssSize.value.width * window.devicePixelRatio,
-      height: canvasCssSize.value.height * window.devicePixelRatio
+      width: canvasCssSize.width * window.devicePixelRatio,
+      height: canvasCssSize.height * window.devicePixelRatio
     }
   },
   set: () => { }
@@ -116,7 +122,8 @@ const resizeCanvas = () => {
   nextTick(painter.draw)
 }
 function lineStyle(a: FormulaNode, b: FormulaNode) {
-  const color = document.createElement('canvas').getContext('2d')!.createLinearGradient(...store.toView(a.pos).tuple(), ...store.toView(b.pos).tuple())
+  // console.log(...store.toView(a.pos).tuple(), ...store.toView(b.pos).tuple(), store.state.OPos.tuple())
+  const color = canvas.value!.getContext('2d')!.createLinearGradient(...store.toView(a.pos).tuple(), ...store.toView(b.pos).tuple())
   color.addColorStop(0, `rgba(78, 197, 241, ${a.style.attrs.opacity.value})`)
   color.addColorStop(1, `rgba(78, 197, 241, ${b.style.attrs.opacity.value})`)
   return {
@@ -164,15 +171,13 @@ const CVS = {
     const node = {
       onMousemove(e: MouseEvent) {
         CVS.mousedown.isClick = false
-        targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.state.zoon))
+        targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.state.zoon.value))
         CVS.mousedown.fPos = new Vector(e.clientX, e.clientY)
         if (targetNode.pos.distance(CVS.menu.node.pos) > 100 && CVS.menu.node.on) {
           CVS.menu.hide()
         }
         Draw()
-        if (!repeling) {
-          repel(store.state.nodes)
-        }
+        store.repel()
       },
       onMouseup(e: MouseEvent) {
         if (CVS.mousedown.isClick) {
@@ -205,13 +210,15 @@ const CVS = {
       window.addEventListener('mouseup', view.onMouseup)
     }
   },
+  wheel: {
+    cursor2OPos: new Vector(),
+  },
   onWheel(e: WheelEvent) {
-    const mousePos = new Vector(e.clientX - canvas.value!.getBoundingClientRect().left, e.clientY - canvas.value!.getBoundingClientRect().top)
+    const cursorPos = new Vector(e.clientX - canvas.value!.getBoundingClientRect().left, e.clientY - canvas.value!.getBoundingClientRect().top)
+    CVS.wheel.cursor2OPos = cursorPos.to(store.state.OPos).div(store.state.zoon.value)
     const zooned = (1 - e.deltaY / 1000) * ZOON.SPEED
-    const newZoon = Math.max(Math.min(store.state.zoon * zooned, ZOON.MAX), ZOON.MIN)
-    store.state.OPos.set(mousePos.add(mousePos.to(store.state.OPos).mul(newZoon / store.state.zoon)))
-    store.state.zoon = newZoon
-    Draw()
+    const newZoon = Math.max(Math.min(store.state.zoon.endValue * zooned, ZOON.MAX), ZOON.MIN)
+    store.state.zoon.value = newZoon
   },
   menu: reactive({
     node: {
@@ -240,6 +247,7 @@ const CVS = {
       on: false,
       pos: new Vector(),
       ctxs: [
+        // 0
         {
           text: '显示节点',
           sec: computed(() =>
@@ -258,6 +266,7 @@ const CVS = {
             CVS.menu.hide()
           }
         },
+        // 1
         {
           text: '隐藏节点',
           sec: computed(() =>
@@ -276,6 +285,7 @@ const CVS = {
             CVS.menu.view.on = false
           }
         },
+        // 2
         {
           text: '添加化学式',
           extra: {
@@ -291,6 +301,7 @@ const CVS = {
             CVS.menu.hide()
           },
         },
+        // 3
         {
           text: '管理化学式',
           extra: {
@@ -307,6 +318,7 @@ const CVS = {
             enableShortcut = false
           },
         },
+        // 4
         {
           text: '添加方程式',
           extra: {
@@ -322,6 +334,7 @@ const CVS = {
             CVS.menu.hide()
           },
         },
+        // 5
         {
           text: '管理方程式',
           extra: {
@@ -337,6 +350,35 @@ const CVS = {
             CVS.menu.hide()
             enableShortcut = false
           },
+        },
+        // 6
+        {
+          text: '集合节点',
+          shortcut: 'G',
+          click() {
+            if (!canvas.value) return
+            const centerSpace = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            const gather = CVS.menu.view.on ? CVS.menu.view.pos : centerSpace
+            for (const n of store.state.nodes) {
+              n.pos.set(gather)
+            }
+            CVS.menu.hide()
+          }
+        },
+        // 7
+        {
+          text: '松弛节点',
+          shortcut: 'R',
+          extra: {
+            pos: new Vector(),
+            on: false,
+          },
+          click() {
+            const centerSpace = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            CVS.menu.view.ctxs[7].extra.pos = CVS.menu.view.on ? CVS.menu.view.pos : centerSpace.add(new Vector(-100, -100))
+            CVS.menu.view.ctxs[7].extra.on = true
+            CVS.menu.hide()
+          }
         },
       ] as { text: string, extra?: any, sec?: { text: string, click: (payload: MouseEvent) => void }[], display?: boolean, shortcut?: string, update?: Function, click: (payload?: MouseEvent) => void }[],
     },
@@ -377,43 +419,6 @@ const CVS = {
     }
   },
 }
-function repel(_nodes: FormulaNode[]) {
-  const nodes = _nodes.filter(n => n.style.type !== NodeStyle.hidden)
-  // console.log(nodes.length)
-  repeling = true
-  const MAX_DISTANCE = 120
-  const SPEED = 0.00016
-  function repulsion(v1: Vector, v2: Vector) {
-    // 二次函数 y = a(x-h)^2
-    return (v1.to(v2).isZero() ? new Vector(Math.random(), Math.random()) : v1.to(v2)).normalize().mul(SPEED * (v1.distance(v2) - MAX_DISTANCE) ** 2)
-  }
-  const forces: Vector[][] = nodes.map(node => [])
-  let over = true
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = 0; j < nodes.length; j++) {
-      if (i === j || nodes[i].pos.distance(nodes[j].pos) > MAX_DISTANCE) {
-        continue
-      }
-      // console.log(2)
-      over = false
-      const f = repulsion(nodes[i].pos, nodes[j].pos)
-      forces[i].push(f.neg())
-      forces[j].push(f)
-    }
-  }
-  for (let i = 0; i < nodes.length; i++) {
-    if (nodes[i].posLocked) continue
-    for (let j = 0; j < forces[i].length; j++) {
-      nodes[i].pos.doAdd(forces[i][j])
-    }
-  }
-  Draw()
-  if (!over) {
-    requestAnimationFrame(() => repel(store.state.nodes))
-  } else {
-    repeling = false
-  }
-}
 
 
 
@@ -424,9 +429,9 @@ const painter = {
     const p = store.toView(n.pos)
     ctx.beginPath()
     ctx.shadowColor = n.style.shadow()
-    ctx.shadowBlur = NODE.RADIUS.value * n.style.attrs.zoon.value * (n.style.attrs.shadowBlur.value + 1)
+    ctx.shadowBlur = NODE.RADIUS() * n.style.attrs.zoon.value * (n.style.attrs.shadowBlur.value + 1)
 
-    ctx.arc(p.x, p.y, NODE.RADIUS.value * n.style.attrs.zoon.value, 0, Math.PI * 2)
+    ctx.arc(p.x, p.y, NODE.RADIUS() * n.style.attrs.zoon.value, 0, Math.PI * 2)
     ctx.fillStyle = n.style.bg()
     ctx.fill()
     ctx.closePath()
@@ -440,8 +445,8 @@ const painter = {
     const p1 = store.toView(a.pos), p2 = store.toView(b.pos)
     const a2b = p1.to(p2).normalize().rotate(angle)
     const b2a = p2.to(p1).normalize().rotate(-angle)
-    const t1 = p1.add(a2b.mul(NODE.RADIUS.value * a.style.attrs.zoon.value)),
-      t2 = p2.add(b2a.mul(NODE.RADIUS.value * b.style.attrs.zoon.value))
+    const t1 = p1.add(a2b.mul(NODE.RADIUS() * a.style.attrs.zoon.value)),
+      t2 = p2.add(b2a.mul(NODE.RADIUS() * b.style.attrs.zoon.value))
     ctx.beginPath()
     ctx.strokeStyle = style.color
     ctx.lineWidth = LINE.WIDTH
@@ -458,9 +463,9 @@ const painter = {
     ctx.beginPath()
     ctx.strokeStyle = style.color
     ctx.lineWidth = LINE.WIDTH
-    ctx.moveTo(...p1.add(a2b.rotate(angle).mul(NODE.RADIUS.value * a.style.attrs.zoon.value)).tuple())
-    ctx.lineTo(...p2.sub(a2b.rotate(-angle).mul(NODE.RADIUS.value * b.style.attrs.zoon.value)).tuple())
-    ctx.lineTo(...p2.sub(a2b.rotate(-angle).mul(NODE.RADIUS.value * b.style.attrs.zoon.value)).sub(a2b.rotate(ARROW.ANGLE).mul(ARROW.LENGTH.value)).tuple())
+    ctx.moveTo(...p1.add(a2b.rotate(angle).mul(NODE.RADIUS() * a.style.attrs.zoon.value)).tuple())
+    ctx.lineTo(...p2.sub(a2b.rotate(-angle).mul(NODE.RADIUS() * b.style.attrs.zoon.value)).tuple())
+    ctx.lineTo(...p2.sub(a2b.rotate(-angle).mul(NODE.RADIUS() * b.style.attrs.zoon.value)).sub(a2b.rotate(ARROW.ANGLE).mul(ARROW.LENGTH())).tuple())
     ctx.stroke()
     ctx.closePath()
   },
@@ -470,13 +475,13 @@ const painter = {
     painter.drawLine(a, b)
     const p1 = store.toView(a.pos), p2 = store.toView(b.pos)
     const b2a = p2.to(p1).normalize()
-    const t = p2.add(b2a.mul(NODE.RADIUS.value * b.style.attrs.zoon.value))
+    const t = p2.add(b2a.mul(NODE.RADIUS() * b.style.attrs.zoon.value))
     ctx.beginPath()
     ctx.strokeStyle = style.color
     ctx.lineWidth = LINE.WIDTH
-    ctx.moveTo(...t.add(b2a.rotate(ARROW.ANGLE).mul(ARROW.LENGTH.value)).tuple())
+    ctx.moveTo(...t.add(b2a.rotate(ARROW.ANGLE).mul(ARROW.LENGTH())).tuple())
     ctx.lineTo(...t.tuple())
-    ctx.lineTo(...t.add(b2a.rotate(-ARROW.ANGLE).mul(ARROW.LENGTH.value)).tuple())
+    ctx.lineTo(...t.add(b2a.rotate(-ARROW.ANGLE).mul(ARROW.LENGTH())).tuple())
     ctx.stroke()
     ctx.closePath()
   },
@@ -536,10 +541,10 @@ const painter = {
   drawFormula(f: FormulaNode) {
     if (!ctx) return;
     const text = f.formula.string()
-    const presize = 20 * store.state.zoon * f.style.attrs.zoon.value
+    const presize = 20 * store.state.zoon.value * f.style.attrs.zoon.value
     ctx.font = `${presize}px Arial`
     const textWidth = ctx.measureText(text).width
-    ctx.font = `${presize * Math.min((NODE.RADIUS.value * f.style.attrs.zoon.value - NODE.FIXED.value * 0.5) * 2 / textWidth, 1)}px Arial`
+    ctx.font = `${presize * Math.min((NODE.RADIUS() * f.style.attrs.zoon.value - NODE.FIXED() * 0.5) * 2 / textWidth, 1)}px Arial`
     ctx.fillStyle = `rgba(256, 256, 256, ${f.style.attrs.opacity.value})`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -549,14 +554,14 @@ const painter = {
     if (!ctx) return
     for (let i = store.toView(new Vector(down(store.toSpace(new Vector(0, 0)).x, GRID.GAP), 0)).x;
       i < canvasNaturalSize.value.width;
-      i += GRID.GAP * store.state.zoon) {
+      i += GRID.GAP * store.state.zoon.value) {
       for (let j = store.toView(new Vector(0, down(store.toSpace(new Vector(0, 0)).y, GRID.GAP))).y;
         j < canvasNaturalSize.value.height;
-        j += GRID.GAP * store.state.zoon) {
-        const r = 5 * store.state.zoon
+        j += GRID.GAP * store.state.zoon.value) {
+        const r = 5 * store.state.zoon.value
         ctx.beginPath()
         ctx.strokeStyle = GRID.COLOR
-        ctx.lineWidth = 1 + store.state.zoon * 0.5
+        ctx.lineWidth = 1 + store.state.zoon.value * 0.5
         ctx.moveTo(i - r, j)
         ctx.lineTo(i + r, j)
         ctx.moveTo(i, j - r)
@@ -612,7 +617,7 @@ share(Draw)
     left: `${store.toView(CVS.menu.node.pos).x}px`,
     top: `${store.toView(CVS.menu.node.pos).y}px`,
     opacity: `${CVS.menu.node.on ? 100 : 0}%`,
-    transform: `scale(${store.state.zoon})`,
+    transform: `scale(${store.state.zoon.value})`,
     pointerEvents: CVS.menu.node.on ? 'all' : 'none',
   }" @wheel="CVS.onWheel">
     <div class="menu-inner menu" :style="{
@@ -638,7 +643,7 @@ share(Draw)
     left: `${store.toView(CVS.menu.view.pos).x}px`,
     top: `${store.toView(CVS.menu.view.pos).y}px`,
     opacity: `${CVS.menu.view.on ? 100 : 0}%`,
-    transform: `scale(${store.state.zoon})`,
+    transform: `scale(${store.state.zoon.value})`,
     pointerEvents: CVS.menu.view.on ? 'all' : 'none',
   }" @wheel="CVS.onWheel">
     <div class="menu-inner menu" :style="{
@@ -672,7 +677,10 @@ share(Draw)
   <ManageEquation :display="CVS.menu.view.ctxs[5].extra.display" @close="CVS.menu.view.ctxs[5].extra.back">
   </ManageEquation>
 
+  <Relaxing v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:on="CVS.menu.view.ctxs[7].extra.on" :wheel="CVS.onWheel"></Relaxing>
+
   <FunctionButton></FunctionButton>
+  
 </template>
 
 <style lang="scss" scoped>
@@ -722,7 +730,7 @@ $menu-bg: rgba($color: #222, $alpha: 0.6);
 
 .menu-ctx-container>div {
   position: relative;
-  padding: 4px 14px;
+  padding: 5px 14px;
   transition: background ease $menu-duration;
   border-radius: 6px;
   color: rgba($color: #dbdbdb, $alpha: 1.0);

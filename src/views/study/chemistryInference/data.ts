@@ -1,8 +1,9 @@
-import { reactive, ref, onUnmounted, watch, type Reactive, type Ref } from "vue"
-import { loadRouteLocation } from "vue-router"
+import { reactive } from "vue"
 import { Vector, type VectorDataType } from "@/assets/scripts/data"
-import { deepEqual, deepClone, ease } from "@/assets/scripts/algorithm"
-import Transition, { TransitionColor } from "@/assets/scripts/transition"
+import { deepEqual, deepClone} from "@/assets/scripts/algorithm"
+import Transition, { SmoothTransition, TransitionColor } from "@/assets/scripts/transition"
+import { ease, easeout } from "@/assets/scripts/timingFunctions"
+import { cubicBezier } from "@/assets/scripts/bezier"
 
 
 let Draw: () => void
@@ -621,7 +622,7 @@ export class FormulaNode {
     this.react = react
     this.produce = produce
     for (const k in this.style.attrs) {
-      this.style.attrs[k as keyof typeof this.style.attrs].onchange = Draw
+      this.style.attrs[k as keyof typeof this.style.attrs].ontransition(Draw)
     }
   }
   setStyle(styleType: NodeStyle, pkg: StylePackageType = styleDefaultPackages[styleType]) {
@@ -690,7 +691,7 @@ const state = reactive<{
   equations: Equation[],
   nodes: FormulaNode[],
   OPos: Vector,
-  zoon: number,
+  zoon: Transition,
 }>({
   equations: [
     Equation.parse('CO2+H2O=H2CO3'),
@@ -707,7 +708,7 @@ const state = reactive<{
     new FormulaNode(Formula.parse('H2CO3')),
   ],
   OPos: new Vector(),
-  zoon: 1,
+  zoon: new SmoothTransition(1, 150, easeout)
 })
 
 
@@ -728,12 +729,13 @@ function toStorage() {
   localStorage.setItem(storageKey, formJson())
 }
 function fromStorage() {
-  // localStorage.clear()
   const data = localStorage.getItem(storageKey)
   if (data) {
     try {
       restoreJson(data)
-    } catch { }
+    } catch {
+      throw Error('localstorage data error')
+    }
   }
 }
 
@@ -771,7 +773,7 @@ function formData() {
     nodes: state.nodes.map(v => v.data()),
     view: {
       OPos: state.OPos.data(),
-      zoon: state.zoon,
+      zoon: state.zoon.value,
     }
   }
 }
@@ -782,7 +784,9 @@ function restoreData(data: DataType) {
   state.equations = data.equations.map(e => Equation.restore(e))
   state.nodes = data.nodes.map(n => FormulaNode.restore(n))
   state.OPos.set(Vector.restore(data.view.OPos))
-  state.zoon = data.view.zoon
+  state.zoon.transitionable = false
+  state.zoon.value = data.view.zoon
+  state.zoon.transitionable = true
   analyzeEquation()
 }
 function saveCopyData() {
@@ -790,16 +794,60 @@ function saveCopyData() {
 }
 
 function toView(v: Vector) {
-  return v.mul(state.zoon).add(state.OPos)
+  return v.mul(state.zoon.value).add(state.OPos)
 }
 function toSpace(v: Vector) {
-  return v.sub(state.OPos).div(state.zoon)
+  return v.sub(state.OPos).div(state.zoon.value)
 }
 function fromCopy() {
   if (copy === null) {
     throw Error('copy data is null')
   }
   restoreData(copy)
+}
+
+let repeling = false
+function _repel() {
+  console.log(1)
+  repeling = true
+  const nodes = state.nodes.filter(n => n.style.type !== NodeStyle.hidden)
+  const MAX_DISTANCE = 120
+  const MAX_DISTANCE_FIX = 5
+  const SPEED = 0.00016
+  function repulsion(v1: Vector, v2: Vector) {
+    // 二次函数 y = a(x-h)^2
+    return (v1.to(v2).isZero() ? new Vector(Math.random(), Math.random()) : v1.to(v2)).normalize().mul(SPEED * (v1.distance(v2) - MAX_DISTANCE) ** 2)
+  }
+  const forces: Vector[][] = nodes.map(node => [])
+  let over = true
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = 0; j < nodes.length; j++) {
+      if (i === j || nodes[i].pos.distance(nodes[j].pos) > MAX_DISTANCE - MAX_DISTANCE_FIX) {
+        continue
+      }
+      over = false
+      const f = repulsion(nodes[i].pos, nodes[j].pos)
+      forces[i].push(f.neg())
+      forces[j].push(f)
+    }
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].posLocked) continue
+    for (let j = 0; j < forces[i].length; j++) {
+      nodes[i].pos.doAdd(forces[i][j])
+    }
+  }
+  Draw()
+  if (!over) {
+    requestAnimationFrame(_repel)
+  } else {
+    repeling = false
+  }
+}
+function repel() {
+  if (!repeling) {
+    _repel()
+  }
 }
 export function useFormulaStore() {
   return {
@@ -820,8 +868,11 @@ export function useFormulaStore() {
 
     toView,
     toSpace,
+
+    repel,
   }
 }
+// localStorage.clear()
 
 
 

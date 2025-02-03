@@ -1,20 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BlankView from '@/BlankView.vue'
-import Study from '../study/Study.vue'
-import ChemistryInference from '../study/chemistryInference/ChemistryInference.vue'
+import Study from '@/views/study/Study.vue'
+import ChemistryInference from '@/views/study/chemistryInference/ChemistryInference.vue'
+import Debug from '@/views/debug/Debug,.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: BlankView,
+      redirect: '/study/blank'
     },
     {
       path: '/study',
       name: 'study',
       component: Study,
+      redirect: '/study/blank',
       
       children: [
         {
@@ -28,6 +29,11 @@ const router = createRouter({
           component: ChemistryInference,
         },
       ],
+    },
+    {
+      path: '/debug',
+      name: 'debug',
+      component: Debug,
     },
   ],
 })
