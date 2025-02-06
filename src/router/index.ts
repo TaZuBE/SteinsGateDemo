@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BlankView from '@/BlankView.vue'
 import Study from '@/views/study/Study.vue'
-import ChemistryInference from '@/views/study/chemistryInference/ChemistryInference.vue'
+import ChemistryInference from '@/views/study/chemistryInference/index.vue'
 import Debug from '@/views/debug/Debug,.vue'
 
 const router = createRouter({

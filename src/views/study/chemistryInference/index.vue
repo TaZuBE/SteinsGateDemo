@@ -31,7 +31,9 @@ onUnmounted(finish)
 <template>
   <Panel :default-size="{ 2: 280 }" p2closable="prefer" :p1min="300" :p2min="250" @resize="resizePanel">
     <template #1>
-      <View :width="viewWidth" :height="viewHeight"></View>
+      <div class="full">
+        <View :width="viewWidth" :height="viewHeight"></View>
+      </div>
     </template>
     <template #2>
       <InfoPanel></InfoPanel>

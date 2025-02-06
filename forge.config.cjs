@@ -10,7 +10,7 @@ module.exports = {
       /node_modules/, 
       /\.git/,
       /src/,
-      /\.vite/
+      /\.vite/,
     ],
   },
   rebuildConfig: {},

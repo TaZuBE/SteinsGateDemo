@@ -1,23 +1,31 @@
 <script lang="ts" setup>
-import { nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { Formula, FormulaNode, useFormulaStore } from './data'
 import Panel from '@/components/Panel.vue'
 import { useToast } from 'vue-toastification'
 import { marked } from 'marked'
 import { Vector } from '@/assets/scripts/data'
+import ResizableWindow from '@/components/ResizableWindow.vue'
 
 const toast = useToast()
 const store = useFormulaStore()
 
 
-const props = defineProps({
-  display: {
-    type: Boolean,
-    required: true,
-  }
-})
 const emit = defineEmits(['close'])
-
+const display = defineModel<boolean>('display', { required: true })
+const spos = defineModel<Vector>('pos', { required: true })
+const vpos = computed(() => store.toView(spos.value))
+const left = computed({
+  get: () => vpos.value.x,
+  set: v => spos.value.x = store.toSpace(new Vector(v, 0)).x
+})
+const top = computed({
+  get: () => vpos.value.y,
+  set: v => spos.value.y = store.toSpace(new Vector(0, v)).y
+})
+const width = defineModel<number>('width', { default: 640 })
+const height = defineModel<number>('height', { default: 480 })
+const fontSize = computed(() => 18 + Math.min(width.value - 480, height.value - 360) * 0.03)
 
 const formulaText = ref('')
 const descriptionText = ref('')
@@ -54,9 +62,29 @@ const formulaInfo = reactive({
 let invalid = ref(false)
 let lastEnterTime = -1
 
+let lastCursorPos = new Vector()
+const draging = ref(false)
+function beginDrag(e: MouseEvent) {
+  document.documentElement.classList.add('pointer-events-none')
+  draging.value = true
+  lastCursorPos = new Vector(e.clientX, e.clientY)
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', overDrag)
+}
+function onDrag(e: MouseEvent) {
+  const cursorPos = new Vector(e.clientX, e.clientY)
+  spos.value.doAdd(store.toSpace(lastCursorPos).to(store.toSpace(cursorPos)))
+  lastCursorPos = cursorPos
+}
+function overDrag() {
+  document.documentElement.classList.remove('pointer-events-none')
+  draging.value = false
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', overDrag)
+}
 
-watch(props, () => {
-  if (props.display) {
+watch(display, () => {
+  if (display.value) {
     formulaText.value = ''
     descriptionText.value = ''
     nextTick(() => {
@@ -136,66 +164,79 @@ function confirm() {
 </script>
 
 <template>
-  <Teleport to=".screen-container">
-    <Transition name="t0">
-      <div v-show="props.display"
-        class="absolute w-100vw h-300vh top--100vh flex justify-center items-center bg-[rgb(15,15,15,0.5)]"
-        @click="emit('close')">
-        <div :class="invalid ? 'shake' : ''"
-          class="w-800px h-600px bg-#333 rounded-xl shadow-2xl grid grid-rows-[60px_1fr] p-[10px_30px]"
-          @click="(e) => e.stopPropagation()">
-          <h1 class="flex items-center justify-center font-size-26px">添加化学式</h1>
-          <div>
-            <Panel :gap="6" :default-size="70" :p1min="200" :p2min="160">
-              <template #1>
-                <Panel :gap="6" :default-size="{ 1: 0 }" :p1min="50" :p2min="100" direction="vertical">
-                  <template #1>
-                    <textarea ref="input1" :class="{ 'outline-[rgba(200,50,50,1)]': invalid }"
-                      class="full bg-#383838 border-none resize-none font-size-20px outline outline-1 outline-[rgba(200,50,50,0)] transition-outline-color"
-                      placeholder="化学式" v-model="formulaText"></textarea>
-                  </template>
-                  <template #2>
-                    <Panel :gap="6">
-                      <template #1>
-                        <textarea ref="input2"
-                          class="full bg-#383838 border-none resize-none font-size-20px outline-none"
-                          placeholder="Markdown描述" v-model="descriptionText"></textarea>
-                      </template>
-                      <template #2>
-                        <div
-                          class="full bg-#383838 font-size-20px rounded-6px absolute left-0 top-0 p-10px overflow-auto markdown"
-                          v-html="marked.parse(descriptionText)">
-                        </div>
-                      </template>
-                    </Panel>
-                  </template>
-                </Panel>
-              </template>
-              <template #2>
-                <div class="full relative">
-                  <div class="p-x-10px *:m-b-8px">
-                    <h3 class="m-0">化学式属性：</h3>
-                    <div v-for="info in formulaInfo">{{ info.text }}：{{ prettyPrint(info.value.toString()) }}</div>
-                  </div>
-                  <div
-                    class="absolute bottom-0 w-full flex flex-col *:font-size-1em *:shadow-none *:bg-#333 *:inline *:p-[4px_18px] *:font-thin">
-                    <button class="hoverbright" @click="emit('close')">
-                      <span class="float-left">取消</span>
-                      <span class="float-right">Esc</span>
-                    </button>
-                    <button class="hoverbright" @click="confirm">
-                      <span class="float-left">确认</span>
-                      <span class="float-right">Enter</span>
-                    </button>
-                  </div>
-                </div>
-              </template>
-            </Panel>
+  <Transition name="t0">
+    <ResizableWindow v-if="display" v-model:left="left" v-model:top="top" v-model:width="width" v-model:height="height"
+      :min-width="480" :min-height="300" :scale="store.view.zoon.value" :resizable="!draging">
+      <div :class="invalid ? 'shake' : ''" class="full bg-#303030 shadow-[#222_0_1px_8px] grid select-none" :style="{
+        fontSize: `${fontSize}px`,
+        gridTemplateRows: `${fontSize * 1.5}px 1fr`,
+        borderRadius: `${fontSize * 0.5}px`
+      }" @click="(e) => e.stopPropagation()">
+        <div class="relative">
+          <h5 class="full flex-center mt--1px" @mousedown="beginDrag">添加化学式</h5>
+          <div class="h-full absolute right-0 top-0 flex justify-end items-center">
+            <span class="material-icons font-size-[0.8em_!important] color-#888 hover:color-#ccc transition-color cursor-pointer" :style="{
+              width: `${fontSize}px`
+            }" @click="display = false">close</span>
           </div>
         </div>
+        <div :style="{
+          padding: `0 ${fontSize * 1}px ${fontSize * 0.6}px ${fontSize * 1}px`,
+        }">
+          <Panel :gap="fontSize * 0.2" :default-size="70" :p1min="200" :p2min="160">
+            <template #1>
+              <Panel :gap="fontSize * 0.2" :default-size="{ 1: fontSize * 2 }" :p1min="fontSize * 2" :p2min="100" direction="vertical">
+                <template #1>
+                  <textarea ref="input1" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
+                    class="full bg-#383838 border-1 border-solid resize-none border-[rgba(200,50,50,0)] transition-border-color"
+                    :style="{
+                      padding: `${fontSize * 0.2}px`
+                    }" placeholder="化学式" v-model="formulaText"></textarea>
+                </template>
+                <template #2>
+                  <Panel :gap="fontSize * 0.2">
+                    <template #1>
+                      <textarea ref="input2" class="full bg-#383838 border-none resize-none outline-none" :style="{
+                        padding: `${fontSize * 0.2}px`
+                      }" placeholder="Markdown描述" v-model="descriptionText"></textarea>
+                    </template>
+                    <template #2>
+                      <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
+                      padding: `${fontSize * 0.2}px`
+                    }"
+                        v-html="marked.parse(descriptionText)">
+                      </div>
+                    </template>
+                  </Panel>
+                </template>
+              </Panel>
+            </template>
+            <template #2>
+              <div class="full relative grid grid-rows-[1fr_auto]" :style="{
+                gap: `${fontSize * 0.3}px`
+              }">
+                <div class="overflow-auto h-full p-x-10px *:m-b-8px *:color-#ccc font-size-0.9em">
+                  <h3 class="m-0">化学式属性：</h3>
+                  <div v-for="info in formulaInfo">{{ info.text }}：{{ prettyPrint(info.value.toString()) }}</div>
+                </div>
+                <div
+                  class="full flex flex-col *:shadow-none *:bg-#303030 *:inline *:p-[4px_18px] *:font-thin font-size-0.9em">
+                  <button class="hoverbright" @click="emit('close')">
+                    <span class="float-left">取消</span>
+                    <span class="float-right">Esc</span>
+                  </button>
+                  <button class="hoverbright" @click="confirm">
+                    <span class="float-left">确认</span>
+                    <span class="float-right">Enter</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </Panel>
+        </div>
       </div>
-    </Transition>
-  </Teleport>
+    </ResizableWindow>
+  </Transition>
 </template>
 
 <style lang="scss" scoped>
@@ -206,7 +247,7 @@ function confirm() {
 
 .t0-enter-from,
 .t0-leave-to {
-  transform: translateY(60px);
+  transform: translateY(20px);
   opacity: 0;
 }
 </style>

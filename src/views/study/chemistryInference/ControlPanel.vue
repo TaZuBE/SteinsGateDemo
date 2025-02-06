@@ -5,9 +5,9 @@ import { Vector } from '@/assets/scripts/data';
 
 const store = useFormulaStore()
 
-const sPos = defineModel<Vector>('pos', { required: true })
+const spos = defineModel<Vector>('pos', { required: true })
 const on = defineModel<boolean>('on', { required: true })
-const vPos = computed(() => store.toView(sPos.value))
+const vpos = computed(() => store.toView(spos.value))
 const props = defineProps({
   wheel: {
     type: Function as PropType<(e: WheelEvent) => void>,
@@ -23,7 +23,7 @@ function beginDrag(e: MouseEvent) {
 }
 function onDrag(e: MouseEvent) {
   const cursorPos = new Vector(e.clientX, e.clientY)
-  sPos.value.doAdd(store.toSpace(lastCursorPos).to(store.toSpace(cursorPos)))
+  spos.value.doAdd(store.toSpace(lastCursorPos).to(store.toSpace(cursorPos)))
   lastCursorPos = cursorPos
 }
 function overDrag() {
@@ -84,12 +84,12 @@ const func = {
 </script>
 
 <template>
-  <Transition name="relaxing">
+  <Transition name="control-panel">
     <div v-if="on"
       class="w-400px h-300px bg-#2a2a2a rounded-6px absolute transform-origin-[0_0] grid grid-rows-[12px_1fr] overflow-hidden select-none"
       :style="{
-        left: `${vPos.x}px`, top: `${vPos.y}px`,
-        transform: `scale(${store.view.zoon.value * 1.2})`,
+        left: `${vpos.x}px`, top: `${vpos.y}px`,
+        transform: `scale(${store.view.zoon.value})`,
       }" @wheel="props.wheel">
       <div class="bg-#222 flex items-center justify-end px-3px" @mousedown="beginDrag">
         <span
@@ -127,13 +127,13 @@ const func = {
 </template>
 
 <style scoped>
-.relaxing-enter-from,
-.relaxing-leave-to {
+.control-panel-enter-from,
+.control-panel-leave-to {
   opacity: 0;
 }
 
-.relaxing-enter-active,
-.relaxing-leave-active {
+.control-panel-enter-active,
+.control-panel-leave-active {
   transition: opacity 200ms;
 }
 </style>

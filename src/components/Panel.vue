@@ -17,8 +17,8 @@ const props = withDefaults(defineProps<{
   defaultSize?: number | { 1: number } | { 2: number }
   gap?: number
 }>(), {
-  p1min: 100,
-  p2min: 100,
+  p1min: 50,
+  p2min: 50,
   p1closable: false,
   p2closable: false,
   direction: 'horizontal',
@@ -129,13 +129,13 @@ const resize = () => {
 // set size in a fixed value and resize panel
 function updateSize(_s: number | { 1: number } | { 2: number }) {
   if (!container.value) return
-  const rect = container.value.getBoundingClientRect()
-  if (rect.width === 0) return
-  const { top, right, bottom, left } = rect
+  const width = container.value.offsetWidth
+  const height = container.value.offsetHeight
+  if (width === 0) return
   if (state === 0) {
     const s = _s as number
-    const low = (props.p1min + props.gap / 2) / (right - left) * 100
-    const high = 100 - (props.p2min + props.gap / 2) / (right - left) * 100
+    const low = (props.p1min + props.gap / 2) / width * 100
+    const high = 100 - (props.p2min + props.gap / 2) / width * 100
     if (s < low / 2 && closing !== 1 && props.p1closable) {
       closing = 1
       console.log
@@ -152,8 +152,8 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
         closing === 1 ? 0 : 100
   } else if (state === 1) {
     const s = _s as number
-    const low = (props.p1min + props.gap / 2) / (bottom - top) * 100
-    const high = 100 - (props.p2min + props.gap / 2) / (bottom - top) * 100
+    const low = (props.p1min + props.gap / 2) / height * 100
+    const high = 100 - (props.p2min + props.gap / 2) / height * 100
     if (s < low / 2 && closing !== 1 && props.p1closable) {
       closing = 1
     } else if (s > high + (100 - high) / 2 && closing !== 2 && props.p2closable) {
@@ -171,29 +171,29 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
   } else if (state === 2) {
     const s = (_s as { 1: number })[1]
     const low = props.p1min + props.gap / 2
-    const high = right - left - props.p2min - props.gap / 2
+    const high = width - props.p2min - props.gap / 2
     size = { 1: Math.min(Math.max(s, low), high) }
     if (s < low / 2 && closing !== 1 && props.p1closable) {
       closing = 1
-    } else if (s > high + (right - left - high) / 2 && closing !== 2 && props.p2closable) {
+    } else if (s > high + (width - high) / 2 && closing !== 2 && props.p2closable) {
       closing = 2
-    } else if (s >= low / 2 && s <= high + (right - left - high) / 2 && closing) {
+    } else if (s >= low / 2 && s <= high + (width - high) / 2 && closing) {
       closing = 0
     }
     closing =
       low <= high ? closing :
         props.p1closable === 'prefer' ? 1 : 2
     size = closing === 0 ? size :
-      closing === 1 ? { 1: 0 } : { 1: right - left }
+      closing === 1 ? { 1: 0 } : { 1: width }
   } else if (state === 3) {
     const s = (_s as { 1: number })[1]
     const low = props.p1min + props.gap / 2
-    const high = bottom - top - props.p2min - props.gap / 2
+    const high = height - props.p2min - props.gap / 2
     if (s < low / 2 && closing !== 1 && props.p1closable) {
       closing = 1
-    } else if (s > high + (bottom - top - high) / 2 && closing !== 2 && props.p2closable) {
+    } else if (s > high + (height - high) / 2 && closing !== 2 && props.p2closable) {
       closing = 2
-    } else if (s >= low / 2 && s <= high + (bottom - top - high) / 2 && closing) {
+    } else if (s >= low / 2 && s <= high + (height - high) / 2 && closing) {
       closing = 0
     }
     closing =
@@ -201,16 +201,16 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
         props.p1closable === 'prefer' ? 1 : 2
     size =
       closing === 0 ? { 1: Math.min(Math.max(s, low), high) } :
-        closing === 1 ? { 1: 0 } : { 1: bottom - top }
+        closing === 1 ? { 1: 0 } : { 1: height }
   } else if (state === 4) {
     const s = (_s as { 2: number })[2]
     const low = props.p2min + props.gap / 2
-    const high = right - left - props.p1min - props.gap / 2
+    const high = width - props.p1min - props.gap / 2
     if (s < low / 2 && closing !== 1 && props.p2closable) {
       closing = 2
-    } else if (s > high + (right - left - high) / 2 && closing !== 2 && props.p1closable) {
+    } else if (s > high + (width - high) / 2 && closing !== 2 && props.p1closable) {
       closing = 1
-    } else if (s >= low / 2 && s <= high + (right - left - high) / 2 && closing) {
+    } else if (s >= low / 2 && s <= high + (width - high) / 2 && closing) {
       closing = 0
     }
     closing =
@@ -218,16 +218,16 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
         props.p1closable === 'prefer' ? 1 : 2
     size =
       closing === 0 ? { 2: Math.min(Math.max(s, low), high) } :
-        closing === 1 ? { 2: right - left } : { 2: 0 }
+        closing === 1 ? { 2: width } : { 2: 0 }
   } else {
     const s = (_s as { 2: number })[2]
     const low = props.p2min + props.gap / 2
-    const high = bottom - top - props.p1min - props.gap / 2
+    const high = height - props.p1min - props.gap / 2
     if (s < low / 2 && closing !== 1 && props.p2closable) {
       closing = 2
-    } else if (s > high + (bottom - top - high) / 2 && closing !== 2 && props.p1closable) {
+    } else if (s > high + (height - high) / 2 && closing !== 2 && props.p1closable) {
       closing = 1
-    } else if (s >= low / 2 && s <= high + (bottom - top - high) / 2 && closing) {
+    } else if (s >= low / 2 && s <= high + (height - high) / 2 && closing) {
       closing = 0
     }
     closing =
@@ -235,7 +235,7 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
         props.p1closable === 'prefer' ? 1 : 2
     size =
       closing === 0 ? { 2: Math.min(Math.max(s, low), high) } :
-        closing === 1 ? { 2: bottom - top } : { 2: 0 }
+        closing === 1 ? { 2: height } : { 2: 0 }
   }
   // panel恢复显示后如果较大幅度更新位置，会造成卡顿
   // 原因：css transition如果更新最终值会重置duration
@@ -260,13 +260,14 @@ const onMousemove = (e: MouseEvent) => {
   e.preventDefault()
   if (!container.value) return
   const { top, right, bottom, left } = container.value.getBoundingClientRect()
+  const scale = (right - left) / container.value.offsetWidth
   const s =
     state === 0 ? (e.clientX - left) / (right - left) * 100 :
       state === 1 ? (e.clientY - top) / (bottom - top) * 100 :
-        state === 2 ? { 1: e.clientX - left } :
-          state === 3 ? { 1: e.clientY - top } :
-            state === 4 ? { 2: right - e.clientX } :
-              { 2: bottom - e.clientY }
+        state === 2 ? { 1: (e.clientX - left) / scale } :
+          state === 3 ? { 1: (e.clientY - top) / scale } :
+            state === 4 ? { 2: (right - e.clientX) / scale } :
+              { 2: (bottom - e.clientY) / scale }
   updateSize(s)
 }
 const onMouseUp = () => {

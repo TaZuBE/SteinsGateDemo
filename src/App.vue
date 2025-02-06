@@ -29,7 +29,7 @@ const route = useRoute()
       <RouterView />
     </div>
   </div>
-  <video class="absolute left-0 top-0 full object-cover op-10 pointer-events-none"
+  <video class="absolute left-0 top-0 full object-cover op-10 pointer-events-none z-9999"
     src="/videos/background-cover/龙族-绘梨衣.mp4" autoplay muted loop />
 </template>
 

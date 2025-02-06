@@ -8,10 +8,6 @@ button {
   border-radius: 4px
 }
 
-button:hover {
-  cursor: pointer;
-}
-
 textarea, input {
   background: transparent;
   padding: 10px;

@@ -5,12 +5,15 @@ import { Formula, FormulaNode, styleDefaultPackages } from './data'
 import { Vector } from '@/assets/scripts/data'
 import { down, up } from '@/assets/scripts/algorithm'
 import { useFormulaStore, NodeStyle, share } from './data'
-import InputFormula from './AddFormula.vue'
+import AddFormula from './AddFormula.vue'
 import ManageFormulaNode from './ManageFormulaNode.vue'
 import AddEquation from './AddEquation.vue'
 import ManageEquation from './ManageEquation.vue'
 import FunctionButton from './FunctionButton.vue'
 import ControlPanel from './ControlPanel.vue'
+import ResizableWindow from '@/components/ResizableWindow.vue'
+import Test from './test.vue'
+import type { ZoomIn } from '@material-ui/icons'
 
 // store
 const store = useFormulaStore()
@@ -86,10 +89,8 @@ function finish() {
 }
 onUnmounted(finish)
 
-// shortcut
-let enableShortcut = true
 function windowKeydown(e: KeyboardEvent) {
-  if (!e.shiftKey || !enableShortcut) return
+  if (!e.shiftKey) return
   for (const ctx of CVS.menu.view.ctxs) {
     if (ctx.shortcut && (e.key === ctx.shortcut || e.key === ctx.shortcut.toLowerCase())) {
       ctx.click()
@@ -246,6 +247,7 @@ const CVS = {
     view: {
       on: false,
       pos: new Vector(),
+      scale: 1,
       ctxs: [
         // 0
         {
@@ -290,14 +292,27 @@ const CVS = {
           text: '添加化学式',
           extra: {
             display: false,
-            back() {
-              CVS.menu.view.ctxs[2].extra.display = false
-              enableShortcut = true
-            },
+            pos: new Vector(),
+            width: 640,
+            height: 480,
+            scale: 1,
+            z: 0,
+            setTopic() {
+              const ctx = CVS.menu.view.ctxs[2]
+              if (ctx.extra.z === 0) return
+              for (let i = 2; i <= 5; i++) {
+                CVS.menu.view.ctxs[i].extra.z--
+              }
+              ctx.extra.z = 0
+            }
           },
           click() {
-            CVS.menu.view.ctxs[2].extra.display = true
-            enableShortcut = false
+            const ctx = CVS.menu.view.ctxs[2]
+            ctx.extra.setTopic()
+            const center = store.toSpace(new Vector(canvas.value!.clientWidth / 2, canvas.value!.clientHeight))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
             CVS.menu.hide()
           },
         },
@@ -306,16 +321,29 @@ const CVS = {
           text: '管理化学式',
           extra: {
             display: false,
-            back() {
-              CVS.menu.view.ctxs[3].extra.display = false
-              enableShortcut = true
-            },
+            pos: new Vector(),
+            width: 800,
+            height: 500,
+            scale: 1,
+            z: -1,
+            setTopic() {
+              const ctx = CVS.menu.view.ctxs[3]
+              if (ctx.extra.z === 0) return
+              for (let i = 2; i <= 5; i++) {
+                CVS.menu.view.ctxs[i].extra.z--
+              }
+              ctx.extra.z = 0
+            }
           },
           shortcut: 'F',
           click() {
-            CVS.menu.view.ctxs[3].extra.display = true
+            const ctx = CVS.menu.view.ctxs[3]
+            ctx.extra.setTopic()
+            const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
             CVS.menu.hide()
-            enableShortcut = false
           },
         },
         // 4
@@ -323,14 +351,27 @@ const CVS = {
           text: '添加方程式',
           extra: {
             display: false,
-            back() {
-              CVS.menu.view.ctxs[4].extra.display = false
-              enableShortcut = true
-            },
+            pos: new Vector(),
+            width: 640,
+            height: 480,
+            scale: 1,
+            z: -2,
+            setTopic() {
+              const ctx = CVS.menu.view.ctxs[4]
+              if (ctx.extra.z === 0) return
+              for (let i = 2; i <= 5; i++) {
+                CVS.menu.view.ctxs[i].extra.z--
+              }
+              ctx.extra.z = 0
+            }
           },
           click() {
-            CVS.menu.view.ctxs[4].extra.display = true
-            enableShortcut = false
+            const ctx = CVS.menu.view.ctxs[4]
+            ctx.extra.setTopic()
+            const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
             CVS.menu.hide()
           },
         },
@@ -339,16 +380,29 @@ const CVS = {
           text: '管理方程式',
           extra: {
             display: false,
-            back() {
-              CVS.menu.view.ctxs[5].extra.display = false
-              enableShortcut = true
-            },
+            pos: new Vector(),
+            width: 800,
+            height: 500,
+            scale: 1,
+            z: -3,
+            setTopic() {
+              const ctx = CVS.menu.view.ctxs[5]
+              if (ctx.extra.z === 0) return
+              for (let i = 2; i <= 5; i++) {
+                CVS.menu.view.ctxs[i].extra.z--
+              }
+              ctx.extra.z = 0
+            }
           },
           shortcut: 'E',
           click() {
-            CVS.menu.view.ctxs[5].extra.display = true
+            const ctx = CVS.menu.view.ctxs[5]
+            ctx.extra.setTopic()
+            const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
             CVS.menu.hide()
-            enableShortcut = false
           },
         },
         // 6
@@ -376,7 +430,7 @@ const CVS = {
           },
           click() {
             const centerSpace = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
-            CVS.menu.view.ctxs[7].extra.pos = CVS.menu.view.on ? CVS.menu.view.pos : centerSpace.add(new Vector(-100, -100))
+            CVS.menu.view.ctxs[7].extra.pos = CVS.menu.view.on ? CVS.menu.view.pos : centerSpace.add(new Vector(-200, -150))
             CVS.menu.view.ctxs[7].extra.on = true
             CVS.menu.hide()
           }
@@ -417,6 +471,7 @@ const CVS = {
       }
       CVS.menu.view.on = true
       CVS.menu.view.pos.set(mouseSpace)
+      CVS.menu.view.scale = 1 / store.view.zoon.value
     }
   },
 }
@@ -661,7 +716,7 @@ share(Draw)
     left: `${store.toView(CVS.menu.view.pos).x}px`,
     top: `${store.toView(CVS.menu.view.pos).y}px`,
     opacity: `${CVS.menu.view.on ? 100 : 0}%`,
-    transform: `scale(${store.view.zoon.value})`,
+    transform: `scale(${store.view.zoon.value * CVS.menu.view.scale})`,
     pointerEvents: CVS.menu.view.on ? 'all' : 'none',
   }" @wheel="CVS.onWheel">
     <div class="menu-inner menu" :style="{
@@ -687,18 +742,36 @@ share(Draw)
     </div>
   </div>
 
-  <InputFormula :display="CVS.menu.view.ctxs[2].extra.display" @close="CVS.menu.view.ctxs[2].extra.back">
-  </InputFormula>
-  <ManageFormulaNode :display="CVS.menu.view.ctxs[3].extra.display" :to-view="store.toView"
-    @close="CVS.menu.view.ctxs[3].extra.back"></ManageFormulaNode>
-  <AddEquation :display="CVS.menu.view.ctxs[4].extra.display" @close="CVS.menu.view.ctxs[4].extra.back"></AddEquation>
-  <ManageEquation :display="CVS.menu.view.ctxs[5].extra.display" @close="CVS.menu.view.ctxs[5].extra.back">
+  <AddFormula v-model:display="CVS.menu.view.ctxs[2].extra.display" :pos="CVS.menu.view.ctxs[2].extra.pos"
+    v-model:width="CVS.menu.view.ctxs[2].extra.width" v-model:height="CVS.menu.view.ctxs[2].extra.height" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[2].extra.z
+    }" @mousedown="CVS.menu.view.ctxs[2].extra.setTopic">
+  </AddFormula>
+  <ManageFormulaNode v-model:pos="CVS.menu.view.ctxs[3].extra.pos" v-model:display="CVS.menu.view.ctxs[3].extra.display"
+    v-model:width="CVS.menu.view.ctxs[3].extra.width" v-model:height="CVS.menu.view.ctxs[3].extra.height"
+    v-model:scale="CVS.menu.view.ctxs[3].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[3].extra.z
+    }" @mousedown="CVS.menu.view.ctxs[3].extra.setTopic">
+  </ManageFormulaNode>
+
+  <AddEquation v-model:display="CVS.menu.view.ctxs[4].extra.display" :pos="CVS.menu.view.ctxs[4].extra.pos"
+    v-model:width="CVS.menu.view.ctxs[4].extra.width" v-model:height="CVS.menu.view.ctxs[4].extra.height" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[4].extra.z
+    }" @mousedown="CVS.menu.view.ctxs[4].extra.setTopic">
+  </AddEquation>
+  <ManageEquation v-model:pos="CVS.menu.view.ctxs[5].extra.pos" v-model:display="CVS.menu.view.ctxs[5].extra.display"
+    v-model:width="CVS.menu.view.ctxs[5].extra.width" v-model:height="CVS.menu.view.ctxs[5].extra.height"
+    v-model:scale="CVS.menu.view.ctxs[5].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[5].extra.z
+    }" @mousedown="CVS.menu.view.ctxs[5].extra.setTopic">
   </ManageEquation>
 
   <ControlPanel v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:on="CVS.menu.view.ctxs[7].extra.on"
     v-model:store.control="store.control" :wheel="CVS.onWheel"></ControlPanel>
 
   <FunctionButton></FunctionButton>
+
+  <!-- <Test></Test> -->
 
 </template>
 
