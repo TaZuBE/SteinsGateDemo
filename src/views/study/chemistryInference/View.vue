@@ -11,9 +11,7 @@ import AddEquation from './AddEquation.vue'
 import ManageEquation from './ManageEquation.vue'
 import FunctionButton from './FunctionButton.vue'
 import ControlPanel from './ControlPanel.vue'
-import ResizableWindow from '@/components/ResizableWindow.vue'
 import Test from './test.vue'
-import type { ZoomIn } from '@material-ui/icons'
 
 // store
 const store = useFormulaStore()
@@ -131,6 +129,8 @@ function lineStyle(a: FormulaNode, b: FormulaNode) {
     color: color
   }
 }
+const nodeMenu = ref<HTMLDivElement | null>(null)
+const viewMenu = ref<HTMLDivElement | null>(null)
 const CVS = {
   mousedown: {
     fPos: new Vector(),
@@ -161,7 +161,6 @@ const CVS = {
         window.removeEventListener('mouseup', view.onMouseup)
       },
       click() {
-        CVS.menu.hide()
         for (const n of store.state.nodes) {
           if (n.style.type === NodeStyle.shown || n.style.type !== NodeStyle.hidden) {
             n.setStyle(NodeStyle.normal)
@@ -174,9 +173,6 @@ const CVS = {
         CVS.mousedown.isClick = false
         targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.view.zoon.value))
         CVS.mousedown.fPos = new Vector(e.clientX, e.clientY)
-        if (targetNode.pos.distance(CVS.menu.node.pos) > 100 && CVS.menu.node.on) {
-          CVS.menu.hide()
-        }
         Draw()
         store.repel()
       },
@@ -190,7 +186,6 @@ const CVS = {
         window.removeEventListener('mouseup', node.onMouseup)
       },
       click() {
-        CVS.menu.hide()
         for (const n of store.state.nodes) {
           if (n.style.type === NodeStyle.shown || n.style.type !== NodeStyle.hidden) {
             n.setStyle(NodeStyle.normal)
@@ -297,18 +292,10 @@ const CVS = {
             height: 480,
             scale: 1,
             z: 0,
-            setTopic() {
-              const ctx = CVS.menu.view.ctxs[2]
-              if (ctx.extra.z === 0) return
-              for (let i = 2; i <= 5; i++) {
-                CVS.menu.view.ctxs[i].extra.z--
-              }
-              ctx.extra.z = 0
-            }
           },
           click() {
             const ctx = CVS.menu.view.ctxs[2]
-            ctx.extra.setTopic()
+            CVS.menu.view.setTopic(2)
             const center = store.toSpace(new Vector(canvas.value!.clientWidth / 2, canvas.value!.clientHeight))
             ctx.extra.display = true
             ctx.extra.scale = 1 / store.view.zoon.value
@@ -326,19 +313,11 @@ const CVS = {
             height: 500,
             scale: 1,
             z: -1,
-            setTopic() {
-              const ctx = CVS.menu.view.ctxs[3]
-              if (ctx.extra.z === 0) return
-              for (let i = 2; i <= 5; i++) {
-                CVS.menu.view.ctxs[i].extra.z--
-              }
-              ctx.extra.z = 0
-            }
           },
           shortcut: 'F',
           click() {
             const ctx = CVS.menu.view.ctxs[3]
-            ctx.extra.setTopic()
+            CVS.menu.view.setTopic(3)
             const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
             ctx.extra.display = true
             ctx.extra.scale = 1 / store.view.zoon.value
@@ -356,18 +335,10 @@ const CVS = {
             height: 480,
             scale: 1,
             z: -2,
-            setTopic() {
-              const ctx = CVS.menu.view.ctxs[4]
-              if (ctx.extra.z === 0) return
-              for (let i = 2; i <= 5; i++) {
-                CVS.menu.view.ctxs[i].extra.z--
-              }
-              ctx.extra.z = 0
-            }
           },
           click() {
             const ctx = CVS.menu.view.ctxs[4]
-            ctx.extra.setTopic()
+            CVS.menu.view.setTopic(4)
             const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
             ctx.extra.display = true
             ctx.extra.scale = 1 / store.view.zoon.value
@@ -385,19 +356,11 @@ const CVS = {
             height: 500,
             scale: 1,
             z: -3,
-            setTopic() {
-              const ctx = CVS.menu.view.ctxs[5]
-              if (ctx.extra.z === 0) return
-              for (let i = 2; i <= 5; i++) {
-                CVS.menu.view.ctxs[i].extra.z--
-              }
-              ctx.extra.z = 0
-            }
           },
           shortcut: 'E',
           click() {
             const ctx = CVS.menu.view.ctxs[5]
-            ctx.extra.setTopic()
+            CVS.menu.view.setTopic(5)
             const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
             ctx.extra.display = true
             ctx.extra.scale = 1 / store.view.zoon.value
@@ -425,17 +388,34 @@ const CVS = {
           text: '控制面板',
           shortcut: 'C',
           extra: {
+            display: false,
             pos: new Vector(),
-            on: false,
+            width: 400,
+            height: 300,
+            scale: 1,
+            z: -4,
           },
           click() {
-            const centerSpace = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
-            CVS.menu.view.ctxs[7].extra.pos = CVS.menu.view.on ? CVS.menu.view.pos : centerSpace.add(new Vector(-200, -150))
-            CVS.menu.view.ctxs[7].extra.on = true
+            const ctx = CVS.menu.view.ctxs[7]
+            CVS.menu.view.setTopic(7)
+            const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
             CVS.menu.hide()
           }
         },
       ] as { text: string, extra?: any, sec?: { text: string, click: (payload: MouseEvent) => void }[], display?: boolean, shortcut?: string, update?: Function, click: (payload?: MouseEvent) => void }[],
+      setTopic(index: number) {
+        const ctx = CVS.menu.view.ctxs[index]
+        const window = [2, 3, 4, 5, 7]
+        for (const i of window) {
+          if (CVS.menu.view.ctxs[i].extra.z > ctx.extra.z) {
+            CVS.menu.view.ctxs[i].extra.z--
+          }
+        }
+        ctx.extra.z = 0
+      }
     },
     hide() {
       CVS.menu.node.on = false
@@ -463,6 +443,13 @@ const CVS = {
           n.setStyle(NodeStyle.unselected)
         }
       }
+      function mousedown(e: MouseEvent) {
+        if (!nodeMenu.value || !nodeMenu.value.contains(e.target as Node)) {
+          CVS.menu.hide()
+          window.removeEventListener('mousedown', mousedown)
+        }
+      }
+      window.addEventListener('mousedown', mousedown)
     } else {
       for (const ctx of CVS.menu.view.ctxs) {
         if (ctx.update) {
@@ -472,6 +459,13 @@ const CVS = {
       CVS.menu.view.on = true
       CVS.menu.view.pos.set(mouseSpace)
       CVS.menu.view.scale = 1 / store.view.zoon.value
+      function mousedown(e: MouseEvent) {
+        if (!viewMenu.value || !viewMenu.value.contains(e.target as Node)) {
+          CVS.menu.hide()
+          window.removeEventListener('mousedown', mousedown)
+        }
+      }
+      window.addEventListener('mousedown', mousedown)
     }
   },
 }
@@ -686,7 +680,7 @@ share(Draw)
     class="absolute left-0 top-0" @mousedown="CVS.onMousedown" @wheel="CVS.onWheel" @contextmenu.prevent="CVS.onMenu">
   </canvas>
 
-  <div class="menu-container node-menu-container" :style="{
+  <div ref="nodeMenu" class="menu-container node-menu-container z-999" :style="{
     left: `${store.toView(CVS.menu.node.pos).x}px`,
     top: `${store.toView(CVS.menu.node.pos).y}px`,
     opacity: `${CVS.menu.node.on ? 100 : 0}%`,
@@ -712,7 +706,7 @@ share(Draw)
       </div>
     </div>
   </div>
-  <div class="menu-container view-menu-container" :style="{
+  <div ref="viewMenu" class="menu-container view-menu-container z-999" :style="{
     left: `${store.toView(CVS.menu.view.pos).x}px`,
     top: `${store.toView(CVS.menu.view.pos).y}px`,
     opacity: `${CVS.menu.view.on ? 100 : 0}%`,
@@ -743,31 +737,36 @@ share(Draw)
   </div>
 
   <AddFormula v-model:display="CVS.menu.view.ctxs[2].extra.display" :pos="CVS.menu.view.ctxs[2].extra.pos"
-    v-model:width="CVS.menu.view.ctxs[2].extra.width" v-model:height="CVS.menu.view.ctxs[2].extra.height" :style="{
+    v-model:width="CVS.menu.view.ctxs[2].extra.width" v-model:height="CVS.menu.view.ctxs[2].extra.height"
+    v-model:scale="CVS.menu.view.ctxs[2].extra.scale" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[2].extra.z
-    }" @mousedown="CVS.menu.view.ctxs[2].extra.setTopic">
+    }" @mousedown="CVS.menu.view.setTopic(2)">
   </AddFormula>
   <ManageFormulaNode v-model:pos="CVS.menu.view.ctxs[3].extra.pos" v-model:display="CVS.menu.view.ctxs[3].extra.display"
     v-model:width="CVS.menu.view.ctxs[3].extra.width" v-model:height="CVS.menu.view.ctxs[3].extra.height"
     v-model:scale="CVS.menu.view.ctxs[3].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[3].extra.z
-    }" @mousedown="CVS.menu.view.ctxs[3].extra.setTopic">
+    }" @mousedown="CVS.menu.view.setTopic(3)">
   </ManageFormulaNode>
 
   <AddEquation v-model:display="CVS.menu.view.ctxs[4].extra.display" :pos="CVS.menu.view.ctxs[4].extra.pos"
-    v-model:width="CVS.menu.view.ctxs[4].extra.width" v-model:height="CVS.menu.view.ctxs[4].extra.height" :style="{
+    v-model:width="CVS.menu.view.ctxs[4].extra.width" v-model:height="CVS.menu.view.ctxs[4].extra.height"
+    v-model:scale="CVS.menu.view.ctxs[4].extra.scale" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[4].extra.z
-    }" @mousedown="CVS.menu.view.ctxs[4].extra.setTopic">
+    }" @mousedown="CVS.menu.view.setTopic(4)">
   </AddEquation>
   <ManageEquation v-model:pos="CVS.menu.view.ctxs[5].extra.pos" v-model:display="CVS.menu.view.ctxs[5].extra.display"
     v-model:width="CVS.menu.view.ctxs[5].extra.width" v-model:height="CVS.menu.view.ctxs[5].extra.height"
     v-model:scale="CVS.menu.view.ctxs[5].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[5].extra.z
-    }" @mousedown="CVS.menu.view.ctxs[5].extra.setTopic">
+    }" @mousedown="CVS.menu.view.setTopic(5)">
   </ManageEquation>
 
-  <ControlPanel v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:on="CVS.menu.view.ctxs[7].extra.on"
-    v-model:store.control="store.control" :wheel="CVS.onWheel"></ControlPanel>
+  <ControlPanel v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:display="CVS.menu.view.ctxs[7].extra.display"
+    v-model:width="CVS.menu.view.ctxs[7].extra.width" v-model:height="CVS.menu.view.ctxs[7].extra.height"
+    :scale="CVS.menu.view.ctxs[7].extra.scale" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[7].extra.z,
+    }" @mousedown="CVS.menu.view.setTopic(7)"></ControlPanel>
 
   <FunctionButton></FunctionButton>
 

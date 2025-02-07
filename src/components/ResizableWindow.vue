@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { Vector } from '@/assets/scripts/data'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { he } from 'vuetify/locale'
 
 // ne = northeast
 enum Area {

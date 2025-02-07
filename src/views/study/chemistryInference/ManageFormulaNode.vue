@@ -43,8 +43,8 @@ const vy = computed({
   get: () => vpos.value.y,
   set: y => spos.value.y = store.toSpace(new Vector(0, y)).y
 })
-const emit = defineEmits(['close'])
 
+const inputFormula = ref<HTMLTextAreaElement | null>(null)
 const selection = ref<FormulaNode | null>(null)
 const formulaText = ref('')
 const descriptionText = ref('')
@@ -59,6 +59,15 @@ const fontSize = computed(() => 16 + Math.min(width.value - 600, height.value - 
 const scale = defineModel<number>('scale', { default: 1 })
 const ctxs = defineModel<any>('ctxs', { required: true })
 
+watch(display, () => {
+  if (display.value) {
+    nextTick(() => {
+      if (inputFormula.value) {
+        inputFormula.value.focus({ preventScroll: true })
+      }
+    })
+  }
+})
 watch(formulaText, () => {
   try {
     const f = Formula.parse(formulaText.value)
@@ -80,7 +89,7 @@ function windowkeydown(e: KeyboardEvent) {
   if (!display.value || (!focusOnFormula.value && !focusOnDescription.value)) return
   if (e.key === 'Escape') {
     e.preventDefault()
-    emit('close')
+    display.value = false
   } else if (e.key === 'Enter' && focusOnFormula.value) {
     e.preventDefault()
     update()
@@ -160,6 +169,7 @@ const act = {
 
 function onAddFormula(e: MouseEvent) {
   ctxs.value[2].extra.display = true
+  ctxs.value[2].extra.scale = 1 / store.view.zoon.value
   ctxs.value[2].extra.pos.set(store.toSpace(new Vector(vx.value + 50, vy.value + 50)))
   ctxs.value[2].extra.setTopic()
 }
@@ -206,21 +216,21 @@ function onAddFormula(e: MouseEvent) {
                   }" @click="onAddFormula" @mousedown="e => e.stopPropagation()">
                     +</div>
                 </div>
-                <div class="flex flex-col overflow-auto">
-                  <div v-for="node in store.state.nodes.filter(n => n.formula.string().includes(pretty(search)))"
-                    class="bg-#303030 font-size-1.2em hover:filter-brightness-120 cursor-pointer relative transition-filter duration-100"
-                    @click="select(node)" :style="{
+                <div class="flex flex-col overflow-hidden">
+                  <div v-for="equ in store.state.nodes.filter(n => n.formula.string().includes(pretty(search)))"
+                    class="w-full bg-#303030 font-size-1.2em hover:filter-brightness-120 cursor-pointer relative transition-filter duration-100"
+                    @click="select(equ)" :style="{
                       padding: `${fontSize * 0.1}px ${fontSize * 0.32}px`,
                       borderRadius: `${fontSize * 0.2}px`,
                     }">
-                    <div class="color-#999 relative select-none transition-[font-weight,color] font-size-0.9em"
-                      :class="{ 'color-#eee font-bold': selection === node }">
-                      <div class="absolute h-full bg-#eee op-0 top-0 rounded-10px transition-opacity"
-                        :class="{ 'op-100': selection === node }" :style="{
-                          left: `${-fontSize * 0.32}px`,
-                          width: `${fontSize * 0.1}px`
-                        }"></div>
-                      {{ node.formula.string() }}
+                    <div class="absolute h-full bg-#eee op-0 left-0 top-0 rounded-10px transition-opacity"
+                      :class="{ 'op-100': selection === equ }" :style="{
+                        width: `${fontSize * 0.1}px`,
+                      }"></div>
+                    <div
+                      class="full color-#999 font-size-0.7em overflow-hidden text-ellipsis transition-[color,font-weight]"
+                      :class="{ 'color-#eee font-bold': selection === equ }">
+                      {{ equ.formula.string() }}
                     </div>
                   </div>
                 </div>
@@ -232,7 +242,7 @@ function onAddFormula(e: MouseEvent) {
                   <Panel :default-size="{ 1: fontSize * 1.6 }" :p1min="fontSize * 1.6" direction="vertical"
                     :gap="fontSize * 0.2">
                     <template #1>
-                      <textarea :class="{ 'border-#f44': invalid }"
+                      <textarea ref="inputFormula" :class="{ 'border-#f44': invalid }"
                         class="absolute left-0 top-0 full border-solid border-1 border-[rgba(140,90,90,0)] transition-border-color bg-#383838 rounded-6px resize-none"
                         :style="{
                           padding: `${fontSize * 0}px ${fontSize * 0.3}px`
@@ -318,7 +328,7 @@ function onAddFormula(e: MouseEvent) {
                       <button class="hoverbright" @click="act.visualized">
                         <span class="float-left">显示</span>
                       </button>
-                      <button class="hoverbright" @click="act.visualized">
+                      <button class="hoverbright" @click="update">
                         <span class="float-left">保存</span>
                         <span class="float-right">Enter</span>
                       </button>

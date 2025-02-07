@@ -10,7 +10,6 @@ const store = data.useFormulaStore()
 // view
 let viewWidth = ref(0)
 let viewHeight = ref(0)
-let formulas: data.Formula[] = []
 const resizePanel = (rect1: DOMRect, rect2: DOMRect) => {
   viewWidth.value = rect1.right - rect1.left
   viewHeight.value = rect1.bottom - rect1.top
@@ -31,9 +30,7 @@ onUnmounted(finish)
 <template>
   <Panel :default-size="{ 2: 280 }" p2closable="prefer" :p1min="300" :p2min="250" @resize="resizePanel">
     <template #1>
-      <div class="full">
-        <View :width="viewWidth" :height="viewHeight"></View>
-      </div>
+      <View :width="viewWidth" :height="viewHeight"></View>
     </template>
     <template #2>
       <InfoPanel></InfoPanel>

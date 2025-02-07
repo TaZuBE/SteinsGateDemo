@@ -25,17 +25,13 @@ const top = computed({
 })
 const width = defineModel<number>('width', { default: 640 })
 const height = defineModel<number>('height', { default: 480 })
+const scale = defineModel<number>('scale', { required: true })
 const fontSize = computed(() => 18 + Math.min(width.value - 480, height.value - 360) * 0.03)
 
 const formulaText = ref('')
 const descriptionText = ref('')
 const input1 = ref<HTMLTextAreaElement | null>(null)
 const input2 = ref<HTMLTextAreaElement | null>(null)
-
-const tip1 = ref<HTMLSpanElement | null>(null)
-const p1min = ref(0)
-const tip2 = ref<HTMLSpanElement | null>(null)
-const p2min = ref(0)
 
 const formulaInfo = reactive({
   valid: {
@@ -61,6 +57,8 @@ const formulaInfo = reactive({
 })
 let invalid = ref(false)
 let lastEnterTime = -1
+let focusOnFormula = ref(false)
+let focusOnDescription = ref(false)
 
 let lastCursorPos = new Vector()
 const draging = ref(false)
@@ -88,10 +86,8 @@ watch(display, () => {
     formulaText.value = ''
     descriptionText.value = ''
     nextTick(() => {
-      if (input1.value && tip1.value && tip2.value) {
-        input1.value.focus()
-        p1min.value = tip1.value.getBoundingClientRect().width + 12
-        p2min.value = tip2.value.getBoundingClientRect().width + 12
+      if (input1.value) {
+        input1.value.focus({ preventScroll: true })
       }
     })
     window.addEventListener('keydown', windowkeydown)
@@ -99,7 +95,8 @@ watch(display, () => {
     window.removeEventListener('keydown', windowkeydown)
   }
 })
-watch(formulaText, () => {
+watch(formulaText, onchangeFormulaText)
+function onchangeFormulaText() {
   try {
     const f = Formula.parse(formulaText.value)
     formulaInfo.valid.value = true
@@ -113,7 +110,7 @@ watch(formulaText, () => {
     formulaInfo.weight.value = -1
   }
   formulaInfo.length.value = formulaText.value.length
-})
+}
 function prettyPrint(str: string) {
   if (str === 'false') {
     return '假'
@@ -128,9 +125,9 @@ function prettyPrint(str: string) {
 }
 
 function windowkeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    emit('close')
-  } else if (e.key === 'Enter' && document.activeElement !== input2.value) {
+  if (e.key === 'Escape' && (focusOnFormula.value || focusOnDescription.value)) {
+    display.value = false
+  } else if (e.key === 'Enter' && focusOnFormula.value) {
     e.preventDefault()
     confirm()
   }
@@ -156,7 +153,7 @@ function confirm() {
     const f = Formula.parse(formulaText.value)
     f.description = descriptionText.value
     store.addNode(new FormulaNode(f, store.toSpace(new Vector(100, 100))))
-    emit('close')
+    display.value = false
   }
 }
 
@@ -166,7 +163,7 @@ function confirm() {
 <template>
   <Transition name="t0">
     <ResizableWindow v-if="display" v-model:left="left" v-model:top="top" v-model:width="width" v-model:height="height"
-      :min-width="480" :min-height="300" :scale="store.view.zoon.value" :resizable="!draging">
+      :min-width="480" :min-height="300" :scale="store.view.zoon.value * scale" :resizable="!draging">
       <div :class="invalid ? 'shake' : ''" class="full bg-#303030 shadow-[#222_0_1px_8px] grid select-none" :style="{
         fontSize: `${fontSize}px`,
         gridTemplateRows: `${fontSize * 1.5}px 1fr`,
@@ -175,36 +172,38 @@ function confirm() {
         <div class="relative">
           <h5 class="full flex-center mt--1px" @mousedown="beginDrag">添加化学式</h5>
           <div class="h-full absolute right-0 top-0 flex justify-end items-center">
-            <span class="material-icons font-size-[0.8em_!important] color-#888 hover:color-#ccc transition-color cursor-pointer" :style="{
-              width: `${fontSize}px`
-            }" @click="display = false">close</span>
+            <span
+              class="material-icons font-size-[0.8em_!important] color-#888 hover:color-#ccc transition-color cursor-pointer"
+              :style="{
+                width: `${fontSize}px`
+              }" @click="display = false">close</span>
           </div>
         </div>
         <div :style="{
           padding: `0 ${fontSize * 1}px ${fontSize * 0.6}px ${fontSize * 1}px`,
         }">
-          <Panel :gap="fontSize * 0.2" :default-size="70" :p1min="200" :p2min="160">
+          <Panel :gap="fontSize * 0.2" :default-size="70" :p1min="fontSize * 10" :p2min="fontSize * 8">
             <template #1>
-              <Panel :gap="fontSize * 0.2" :default-size="{ 1: fontSize * 2 }" :p1min="fontSize * 2" :p2min="100" direction="vertical">
+              <Panel :gap="fontSize * 0.2" :default-size="{ 1: fontSize * 2 }" :p1min="fontSize * 2" :p2min="100"
+                direction="vertical">
                 <template #1>
                   <textarea ref="input1" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
                     class="full bg-#383838 border-1 border-solid resize-none border-[rgba(200,50,50,0)] transition-border-color"
                     :style="{
                       padding: `${fontSize * 0.2}px`
-                    }" placeholder="化学式" v-model="formulaText"></textarea>
+                    }" placeholder="化学式" v-model="formulaText" @focusin="focusOnFormula = true" @focusout="focusOnFormula = false"></textarea>
                 </template>
                 <template #2>
                   <Panel :gap="fontSize * 0.2">
                     <template #1>
                       <textarea ref="input2" class="full bg-#383838 border-none resize-none outline-none" :style="{
                         padding: `${fontSize * 0.2}px`
-                      }" placeholder="Markdown描述" v-model="descriptionText"></textarea>
+                      }" placeholder="Markdown描述" v-model="descriptionText" @focusin="focusOnDescription = true" @focusout="focusOnDescription = false"></textarea>
                     </template>
                     <template #2>
                       <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
-                      padding: `${fontSize * 0.2}px`
-                    }"
-                        v-html="marked.parse(descriptionText)">
+                        padding: `${fontSize * 0.2}px`
+                      }" v-html="marked.parse(descriptionText)">
                       </div>
                     </template>
                   </Panel>
@@ -221,7 +220,7 @@ function confirm() {
                 </div>
                 <div
                   class="full flex flex-col *:shadow-none *:bg-#303030 *:inline *:p-[4px_18px] *:font-thin font-size-0.9em">
-                  <button class="hoverbright" @click="emit('close')">
+                  <button class="hoverbright" @click="display = false">
                     <span class="float-left">取消</span>
                     <span class="float-right">Esc</span>
                   </button>
