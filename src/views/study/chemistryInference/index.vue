@@ -18,6 +18,7 @@ const resizePanel = (rect1: DOMRect, rect2: DOMRect) => {
 onMounted(() => {
   window.addEventListener('unload', finish)
   store.fromStorage()
+  store.state.init = true
 })
 function finish() {
   window.removeEventListener('unload', finish)

@@ -171,6 +171,7 @@ type FormulaDataType = {
     quantity: number,
   }[],
   description: string,
+  tag: string[]
 }
 type FormulaComponent = {
   el: CElement | {
@@ -182,9 +183,11 @@ type FormulaComponent = {
 export class Formula {
   value: FormulaComponent[]
   description: string
-  constructor(value: FormulaComponent[], description: string = '') {
+  tag: string[]
+  constructor(value: FormulaComponent[], description: string = '', tag: string[] = []) {
     this.value = value
     this.description = description
+    this.tag = tag
   }
   reactant(coef: number = 1) {
     return new Reactant(this, coef)
@@ -234,17 +237,22 @@ export class Formula {
         })) : v.el.symbol,
         quantity: v.quantity,
       })),
-      description: this.description
+      description: this.description,
+      tag: this.tag
     }
   }
   static restore(data: FormulaDataType) {
-    return new Formula(data.value.map(v => ({
-      el: Array.isArray(v.el) ? v.el.map(e => ({
-        el: celements.find(ce => ce.symbol === e.el)!,
-        quantity: e.quantity,
-      })) : celements.find(ce => ce.symbol === v.el)!,
-      quantity: v.quantity,
-    })), data.description)
+    return new Formula(
+      data.value.map(v => ({
+        el: Array.isArray(v.el) ? v.el.map(e => ({
+          el: celements.find(ce => ce.symbol === e.el)!,
+          quantity: e.quantity,
+        })) : celements.find(ce => ce.symbol === v.el)!,
+        quantity: v.quantity,
+      })),
+      data.description,
+      data.tag,
+    )
   }
   static parse(str: string) {
     str = unpretty(str)
@@ -369,10 +377,6 @@ export class Formula {
   clone() {
     return new Formula(deepClone(this.value), this.description)
   }
-  set(f: Formula) {
-    this.value = deepClone(f.value)
-    this.description = f.description
-  }
 }
 // Like 3H20
 type ReactantDataType = {
@@ -456,20 +460,23 @@ export class Product {
 // Like S+O2=(点燃)SO2
 type EquationDataType = {
   reactant: ReactantDataType[]
-  product: ProductDataType[],
+  product: ProductDataType[]
   condition: string
   description: string
+  tag: string[]
 }
 export class Equation {
   reactant: Reactant[]
   product: Product[]
   condition: string
   description: string
-  constructor(reactant: Reactant[], product: Product[], condition: string = '', description: string = '') {
+  tag: string[]
+  constructor(reactant: Reactant[], product: Product[], condition: string = '', description: string = '', tag: string[] = []) {
     this.reactant = reactant
     this.product = product
     this.condition = condition
     this.description = description
+    this.tag = tag
   }
   data(): EquationDataType {
     return {
@@ -477,6 +484,7 @@ export class Equation {
       product: this.product.map(p => p.data()),
       condition: this.condition,
       description: this.description,
+      tag: this.tag
     }
   }
   static restore(data: EquationDataType) {
@@ -484,7 +492,8 @@ export class Equation {
       data.reactant.map(r => Reactant.restore(r)),
       data.product.map(p => Product.restore(p)),
       data.condition,
-      data.description
+      data.description,
+      data.tag,
     )
   }
   static parse(eq: string) {
@@ -532,6 +541,7 @@ export class Equation {
     this.product = equ.product.map(p => p.clone())
     this.condition = equ.condition
     this.description = equ.description
+    this.tag = Array.from(equ.tag)
   }
 }
 
@@ -616,6 +626,8 @@ export class FormulaNode {
       return `rgba(${this.attrs.color.value.r},${this.attrs.color.value.g},${this.attrs.color.value.b},${this.attrs.shadowOpacity.value})`
     },
   }
+  hidden: boolean = false
+  filtered: boolean = false
   constructor(formula: Formula, pos: Vector = new Vector(), react: FormulaNode[] = [], produce: FormulaNode[] = []) {
     this.formula = formula
     this.pos = pos
@@ -637,11 +649,12 @@ export class FormulaNode {
     return {
       formula: this.formula.data(),
       pos: this.pos.data(),
-      hidden: this.style.type === NodeStyle.hidden
+      hidden: this.hidden,
     }
   }
   static restore(data: FormulaNodeDataType) {
     const res = new FormulaNode(Formula.restore(data.formula), Vector.restore(data.pos))
+    res.hidden = data.hidden
     if (data.hidden) {
       res.setStyle(NodeStyle.hidden, {
         color: { v: [4, 180, 153], d: 0 },
@@ -688,6 +701,7 @@ function getNode(f: Formula) {
 
 
 const state = reactive({
+  init: false,
   equations: [
     Equation.parse('CO2+H2O=H2CO3'),
     Equation.parse('H2CO3=CO2+H2O'),
@@ -702,6 +716,7 @@ const state = reactive({
     new FormulaNode(Formula.parse('H2O')),
     new FormulaNode(Formula.parse('H2CO3')),
   ],
+  filteredTags: [] as string[],
 })
 const view = reactive({
   OPos: new Vector(),
@@ -717,11 +732,20 @@ const control = reactive({
 
 
 type DataType = {
-  equations: EquationDataType[],
-  nodes: FormulaNodeDataType[],
+  state: {
+    equations: EquationDataType[],
+    nodes: FormulaNodeDataType[],
+    filteredTags: string[]
+  },
   view: {
     OPos: VectorDataType,
     zoon: number,
+  },
+  control: {
+    grid: boolean,
+    side: boolean,
+    barycenter: boolean,
+    repulsion: boolean,
   }
 }
 
@@ -770,27 +794,42 @@ function deleteEquation(equ: Equation) {
 function formJson() {
   return JSON.stringify(formData(), null, 2)
 }
-function formData() {
+function formData(): DataType {
   return {
-    equations: state.equations.map(eq => eq.data()),
-    nodes: state.nodes.map(v => v.data()),
+    state: {
+      equations: state.equations.map(eq => eq.data()),
+      nodes: state.nodes.map(v => v.data()),
+      filteredTags: state.filteredTags,
+    },
     view: {
       OPos: view.OPos.data(),
       zoon: view.zoon.value,
-    }
+    },
+    control: {
+      grid: control.grid,
+      side: control.side,
+      barycenter: control.barycenter,
+      repulsion: control.repulsion,
+    },
   }
 }
 function restoreJson(json: string) {
   restoreData(JSON.parse(json))
 }
 function restoreData(data: DataType) {
-  state.equations = data.equations.map(e => Equation.restore(e))
-  state.nodes = data.nodes.map(n => FormulaNode.restore(n))
+  state.equations = data.state.equations.map(e => Equation.restore(e))
+  state.nodes = data.state.nodes.map(n => FormulaNode.restore(n))
+  state.filteredTags = data.state.filteredTags
   view.OPos.set(Vector.restore(data.view.OPos))
   view.zoon.transitionable = false
   view.zoon.value = data.view.zoon
   view.zoon.transitionable = true
+  control.grid = data.control.grid
+  control.side = data.control.side
+  control.barycenter = data.control.barycenter
+  control.repulsion = data.control.repulsion
   analyzeEquation()
+  filter()
 }
 function saveCopyData() {
   copy = deepClone(formData())
@@ -817,6 +856,20 @@ function barycenter() {
 function radius() {
   const center = barycenter()
   return state.nodes.reduce((accumulator, n) => accumulator + center.to(n.pos).len(), 0) / state.nodes.length
+}
+function allTags() {
+  const tags = new Set<string>()
+  for (const n of state.nodes) {
+    for (const t of n.formula.tag) {
+      tags.add(t)
+    }
+  }
+  for (const e of state.equations) {
+    for (const t of e.tag) {
+      tags.add(t)
+    }
+  }
+  return Array.from(tags)
 }
 
 let repeling = false
@@ -864,6 +917,38 @@ function repel() {
 function scale(ratio: number, origin: Vector = barycenter()) {
   state.nodes.map(n => n.pos.doAdd(origin.to(n.pos).mul(ratio - 1)))
 }
+function filter() {
+  const tags = state.filteredTags
+  const _saved = new Set<Formula>()
+  for (const equ of state.equations) {
+    if (tags.filter(t => equ.tag.includes(t)).length) {
+      for (const r of equ.reactant) {
+        _saved.add(r.formula)
+      }
+      for (const p of equ.product) {
+        _saved.add(p.formula)
+      }
+    }
+  }
+  const saved = Array.from(_saved)
+  for (const n of state.nodes) {
+    if (n.formula.tag.length && tags.filter(t => n.formula.tag.includes(t)).length === 0 && !saved.filter(s => s.deepEqual(n.formula)).length) {
+      n.setStyle(NodeStyle.hidden, state.init ? undefined : {
+        color: { v: [4, 180, 153], d: 0 },
+        opacity: { v: 0, d: 0 },
+        zoon: { v: 0, d: 0 },
+        shadowOpacity: { v: 0, d: 0 },
+        shadowBlur: { v: 0, d: 0 },
+      })
+      n.filtered = false
+    } else {
+      n.filtered = true
+      if (!n.hidden) {
+        n.setStyle(NodeStyle.normal)
+      }
+    }
+  }
+}
 
 export function useFormulaStore() {
   return {
@@ -888,10 +973,12 @@ export function useFormulaStore() {
     toSpace,
     barycenter,
     radius,
+    allTags,
 
     Draw,
     repel,
     scale,
+    filter,
   }
 }
 // localStorage.clear()

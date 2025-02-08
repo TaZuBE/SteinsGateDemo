@@ -89,7 +89,7 @@ onMounted(() => {
 const resize = () => {
   if (!container.value || !d1.value || !handle.value || !d2.value) return
   const rect = container.value.getBoundingClientRect()
-  if (rect.width === 0) return
+  if (rect.width === 0 || rect.height === 0) return
   const { width, height } = rect
   if (state === 0) {
     const s = size as number
@@ -131,7 +131,7 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
   if (!container.value) return
   const width = container.value.offsetWidth
   const height = container.value.offsetHeight
-  if (width === 0) return
+  if (width === 0 || height === 0) return
   if (state === 0) {
     const s = _s as number
     const low = (props.p1min + props.gap / 2) / width * 100
@@ -167,7 +167,6 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
     size =
       closing === 0 ? Math.min(Math.max(s, low), high) :
         closing === 1 ? 0 : 100
-
   } else if (state === 2) {
     const s = (_s as { 1: number })[1]
     const low = props.p1min + props.gap / 2
@@ -244,8 +243,8 @@ function updateSize(_s: number | { 1: number } | { 2: number }) {
   // }
   // 备用方案：恢复显示时不过渡
   transitionable.value = closing !== 0
-  nextTick(resize)
-  // resize()
+  // nextTick(resize)
+  resize()
 }
 function updateState() {
   state =

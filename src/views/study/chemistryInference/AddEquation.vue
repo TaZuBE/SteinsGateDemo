@@ -24,13 +24,15 @@ const top = computed({
 })
 const width = defineModel<number>('width', { default: 640 })
 const height = defineModel<number>('height', { default: 480 })
-  const scale = defineModel<number>('scale', { required: true })
+const scale = defineModel<number>('scale', { required: true })
 const fontSize = computed(() => 18 + Math.min(width.value - 480, height.value - 360) * 0.03)
 
 const equationText = ref('')
 const descriptionText = ref('')
-const input1 = ref<HTMLTextAreaElement | null>(null)
-const input2 = ref<HTMLTextAreaElement | null>(null)
+const tagText = ref('')
+const inputEquation = ref<HTMLTextAreaElement | null>(null)
+const inputDescription = ref<HTMLTextAreaElement | null>(null)
+const inputTag = ref<HTMLTextAreaElement | null>(null)
 
 const equationInfo = reactive({
   valid: {
@@ -44,13 +46,14 @@ const equationInfo = reactive({
 })
 let invalid = ref(false)
 let lastEnterTime = -1
-let focusOnText = ref(false)
-let focusOnDescription = ref(false)
+const focusOnText = ref(false)
+const focusOnDescription = ref(false)
+const focusOnTag = ref(false)
 
 let lastCursorPos = new Vector()
 const draging = ref(false)
 function beginDrag(e: MouseEvent) {
-  document.documentElement.classList.add('pointer-events-none')
+  document.documentElement.classList.add('cursor-default')
   draging.value = true
   lastCursorPos = new Vector(e.clientX, e.clientY)
   window.addEventListener('mousemove', onDrag)
@@ -62,7 +65,7 @@ function onDrag(e: MouseEvent) {
   lastCursorPos = cursorPos
 }
 function overDrag() {
-  document.documentElement.classList.remove('pointer-events-none')
+  document.documentElement.classList.remove('cursor-default')
   draging.value = false
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', overDrag)
@@ -73,8 +76,8 @@ watch(display, () => {
     equationText.value = ''
     descriptionText.value = ''
     nextTick(() => {
-      if (input1.value) {
-        input1.value.focus({ preventScroll: true })
+      if (inputEquation.value) {
+        inputEquation.value.focus({ preventScroll: true })
       }
     })
     window.addEventListener('keydown', windowkeydown)
@@ -107,7 +110,7 @@ function prettyPrint(str: string) {
 }
 
 function windowkeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && (focusOnText.value || focusOnDescription.value)) {
+  if (e.key === 'Escape' && (focusOnText.value || focusOnDescription.value || focusOnTag.value)) {
     display.value = false
   } else if (e.key === 'Enter' && focusOnText.value) {
     e.preventDefault()
@@ -134,6 +137,7 @@ function confirm() {
     toast.success('成功添加方程式')
     const equ = Equation.parse(equationText.value)
     equ.description = descriptionText.value
+    equ.tag = tagText.value.split(' ').filter(t => t !== '')
     store.addEquation(equ)
     display.value = false
   }
@@ -144,7 +148,7 @@ function confirm() {
 </script>
 
 <template>
-  <Transition name="t0">
+  <Transition name="add-equation">
     <ResizableWindow v-if="display" v-model:left="left" v-model:top="top" v-model:width="width" v-model:height="height"
       :min-width="480" :min-height="300" :scale="store.view.zoon.value * scale" :resizable="!draging">
       <div :class="invalid ? 'shake' : ''" class="full bg-#303030 shadow-[#222_0_1px_8px] grid select-none" :style="{
@@ -170,24 +174,38 @@ function confirm() {
               <Panel :gap="fontSize * 0.2" :default-size="{ 1: fontSize * 2 }" :p1min="fontSize * 2" :p2min="100"
                 direction="vertical">
                 <template #1>
-                  <textarea ref="input1" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
+                  <textarea ref="inputEquation" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
                     class="full bg-#383838 border-1 border-solid resize-none border-[rgba(200,50,50,0)] transition-border-color"
                     :style="{
                       padding: `${fontSize * 0.2}px`
-                    }" placeholder="方程式" v-model="equationText" @focusin="focusOnText = true" @focusout="focusOnText = false"></textarea>
+                    }" placeholder="方程式" v-model="equationText" @focusin="focusOnText = true"
+                    @focusout="focusOnText = false"></textarea>
                 </template>
                 <template #2>
-                  <Panel :gap="fontSize * 0.2">
+                  <Panel :gap="fontSize * 0.2" direction="vertical" :default-size="{ 2: fontSize * 2 }"
+                    :p2min="fontSize * 2">
                     <template #1>
-                      <textarea ref="input2" class="full bg-#383838 border-none resize-none outline-none" :style="{
-                        padding: `${fontSize * 0.2}px`
-                      }" placeholder="Markdown描述" v-model="descriptionText" @focusin="focusOnDescription = true" @focusout="focusOnDescription = false"></textarea>
+                      <Panel :gap="fontSize * 0.2">
+                        <template #1>
+                          <textarea ref="inputDescription" class="full bg-#383838 border-none resize-none outline-none"
+                            :style="{
+                              padding: `${fontSize * 0.2}px`
+                            }" placeholder="Markdown描述" v-model="descriptionText" @focusin="focusOnDescription = true"
+                            @focusout="focusOnDescription = false"></textarea>
+                        </template>
+                        <template #2>
+                          <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
+                            padding: `${fontSize * 0.2}px`
+                          }" v-html="marked.parse(descriptionText)">
+                          </div>
+                        </template>
+                      </Panel>
                     </template>
                     <template #2>
-                      <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
+                      <textarea ref="tagInput" class="full bg-#383838 border-none resize-none outline-none" :style="{
                         padding: `${fontSize * 0.2}px`
-                      }" v-html="marked.parse(descriptionText)">
-                      </div>
+                      }" placeholder="标签" v-model="tagText" @focusin="focusOnTag = true"
+                        @focusout="focusOnTag = false"></textarea>
                     </template>
                   </Panel>
                 </template>
@@ -222,14 +240,14 @@ function confirm() {
 </template>
 
 <style lang="scss" scoped>
-.t0-enter-active,
-.t0-leave-active {
+.add-equation-leave-active,
+.add-equation-enter-active {
   transition: opacity 200ms, transform 200ms;
 }
 
-.t0-enter-from,
-.t0-leave-to {
-  transform: translateY(20px);
+.add-equation-enter-from,
+.add-equation-leave-to {
   opacity: 0;
+  transform: translateY(20px) scale(0.3);
 }
 </style>

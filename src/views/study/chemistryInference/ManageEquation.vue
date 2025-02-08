@@ -13,7 +13,7 @@ const toast = useToast()
 let lastCursorPos = new Vector()
 const draging = ref(false)
 function beginDrag(e: MouseEvent) {
-  document.documentElement.classList.add('pointer-events-none')
+  document.documentElement.classList.add('cursor-default')
   draging.value = true
   lastCursorPos = new Vector(e.clientX, e.clientY)
   window.addEventListener('mousemove', onDrag)
@@ -25,7 +25,7 @@ function onDrag(e: MouseEvent) {
   lastCursorPos = cursorPos
 }
 function overDrag() {
-  document.documentElement.classList.remove('pointer-events-none')
+  document.documentElement.classList.remove('cursor-default')
   draging.value = false
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', overDrag)
@@ -47,11 +47,13 @@ const inputEquation = ref<HTMLTextAreaElement | null>(null)
 const selection = ref<Equation | null>(null)
 const EquationText = ref('')
 const descriptionText = ref('')
+const tagText = ref('')
 const invalid = ref(false)
 const currentEquation = ref<Equation | null>(null)
 const search = ref('')
-let focusOnFormula = ref(false)
-let focusOnDescription = ref(false)
+const focusOnEquation = ref(false)
+const focusOnDescription = ref(false)
+const focusOnTag = ref(false)
 const width = defineModel<number>('width', { default: 800 })
 const height = defineModel<number>('height', { default: 500 })
 const fontSize = computed(() => 16 + Math.min(width.value - 600, height.value - 400) * 0.03)
@@ -70,7 +72,6 @@ watch(display, () => {
 watch(EquationText, () => {
   try {
     const equ = Equation.parse(EquationText.value)
-    equ.description = descriptionText.value
     currentEquation.value = equ
   } catch {
     currentEquation.value = null
@@ -85,11 +86,11 @@ onUnmounted(() => {
 })
 
 function windowkeydown(e: KeyboardEvent) {
-  if (!display.value || (!focusOnFormula.value && !focusOnDescription.value)) return
+  if (!display.value || (!focusOnEquation.value && !focusOnDescription.value && !focusOnTag.value)) return
   if (e.key === 'Escape') {
     e.preventDefault()
     display.value = false
-  } else if (e.key === 'Enter' && focusOnFormula.value) {
+  } else if (e.key === 'Enter' && focusOnEquation.value) {
     e.preventDefault()
     update()
   } else if (e.ctrlKey && (e.key == 'R' || e.key == 'r')) {
@@ -106,6 +107,7 @@ function select(equ: Equation) {
     selection.value = equ
     EquationText.value = equ.string()
     descriptionText.value = equ.description
+    tagText.value = equ.tag.join(' ')
   }
 }
 
@@ -119,6 +121,7 @@ function update() {
   try {
     const equ = Equation.parse(EquationText.value)
     equ.description = descriptionText.value
+    equ.tag = tagText.value.split(' ').filter(t => t !== '')
     if (store.state.equations.filter(e => e.deepEqual(equ)).length && !selection.value.deepEqual(equ)) {
       toast.dismiss('equation repeated')
       nextTick(() => toast.error('方程式重复', {
@@ -179,7 +182,7 @@ function onAddFormula(e: MouseEvent) {
           gridTemplateRows: `${fontSize * 1.5}px 1fr`
         }">
         <div class="bg-#303030 flex items-center flex-justify-end relative px-6px" @mousedown="beginDrag">
-          <h5 class="absolute full flex-center color-#ccc pointer-events-none">管理方程式</h5>
+          <h5 class="absolute full flex-center color-#ccc cursor-default pointer-events-none">管理方程式</h5>
           <span
             class="material-icons font-size-[1em_!important] color-#888 hover:color-#ccc transition-color cursor-pointer"
             @click="display = false" @mousedown="e => e.stopPropagation()">close</span>
@@ -218,7 +221,8 @@ function onAddFormula(e: MouseEvent) {
                       :class="{ 'op-100': selection === equ }" :style="{
                         width: `${fontSize * 0.1}px`,
                       }"></div>
-                    <div class="full color-#999 font-size-0.7em overflow-hidden text-ellipsis transition-[color,font-weight]"
+                    <div
+                      class="full color-#999 font-size-0.7em overflow-hidden text-ellipsis transition-[color,font-weight]"
                       :class="{ 'color-#eee font-bold': selection === equ }">
                       {{ equ.string() }}
                     </div>
@@ -236,23 +240,30 @@ function onAddFormula(e: MouseEvent) {
                         class="absolute left-0 top-0 full border-solid border-1 border-[rgba(140,90,90,0)] transition-border-color bg-#383838 rounded-6px resize-none"
                         :style="{
                           padding: `${fontSize * 0}px ${fontSize * 0.3}px`
-                        }" v-model="EquationText" placeholder="方程式" @focusin="focusOnFormula = true"
-                        @focusout="focusOnFormula = false"></textarea>
+                        }" v-model="EquationText" placeholder="方程式" @focusin="focusOnEquation = true"
+                        @focusout="focusOnEquation = false"></textarea>
                     </template>
                     <template #2>
-                      <Panel :gap="fontSize * 0.2">
+                      <Panel direction="vertical" :gap="fontSize * 0.2" :default-size="{ 2: fontSize * 2.3 }" :p2min="fontSize * 2.3">
                         <template #1>
-                          <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="descriptionText"
-                            placeholder="Markdown描述" @focus="focusOnDescription = true"
-                            @blur="focusOnDescription = false"></textarea>
+                          <Panel :gap="fontSize * 0.2">
+                            <template #1>
+                              <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="descriptionText"
+                                placeholder="Markdown描述" @focus="focusOnDescription = true"
+                                @blur="focusOnDescription = false"></textarea>
+                            </template>
+                            <template #2>
+                              <div
+                                class="full bg-#383838 font-size-1.2em rounded-6px absolute left-0 top-0 p-6px overflow-auto markdown"
+                                v-html="marked.parse(descriptionText)"></div>
+                            </template>
+                          </Panel>
                         </template>
                         <template #2>
-                          <div
-                            class="full bg-#383838 font-size-1.2em rounded-6px absolute left-0 top-0 p-6px overflow-auto markdown"
-                            v-html="marked.parse(descriptionText)"></div>
+                          <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="tagText"
+                            placeholder="标签" @focus="focusOnTag = true" @blur="focusOnTag = false"></textarea>
                         </template>
                       </Panel>
-
                     </template>
                   </Panel>
                 </template>
@@ -304,15 +315,14 @@ function onAddFormula(e: MouseEvent) {
 </template>
 
 <style lang="scss" scoped>
+.manage-equation-leave-active,
+.manage-equation-enter-active {
+  transition: opacity 200ms, transform 200ms;
+}
+
 .manage-equation-enter-from,
 .manage-equation-leave-to {
   opacity: 0;
-  transform: translateY(20px);
-}
-
-.manage-equation-enter-active,
-.manage-equation-leave-active {
-  transition-property: opacity, transform;
-  transition-duration: 200ms;
+  transform: translateY(20px) scale(0.3);
 }
 </style>

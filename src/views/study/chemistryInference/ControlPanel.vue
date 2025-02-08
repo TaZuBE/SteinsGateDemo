@@ -26,9 +26,10 @@ const props = defineProps({
     required: true,
   }
 })
-let lastCursorPos = new Vector()
 
+let lastCursorPos = new Vector()
 function beginDrag(e: MouseEvent) {
+  document.documentElement.classList.add('cursor-default')
   lastCursorPos = new Vector(e.clientX, e.clientY)
   window.addEventListener('mousemove', onDrag)
   window.addEventListener('mouseup', overDrag)
@@ -39,6 +40,7 @@ function onDrag(e: MouseEvent) {
   lastCursorPos = cursorPos
 }
 function overDrag() {
+  document.documentElement.classList.remove('cursor-default')
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', overDrag)
 }
@@ -127,7 +129,7 @@ const func = {
             gap: `${fontSize * 0.4}px`
           }">
             <h6 class="color-#888">功能</h6>
-            <v-btn class="bg-#333 w-80px h-50px font-size-0.8em" :style="{
+            <v-btn class="bg-#333 font-size-0.8em" :style="{
               width: `${fontSize * 4.5}px`,
               height: `${fontSize * 2}px`,
             }" prepend-icon="touch_app" @mousedown=func.cohering.down @mouseup="func.cohering.up">
@@ -136,7 +138,7 @@ const func = {
               </template>
               紧凑
             </v-btn>
-            <v-btn class="bg-#333 w-80px h-50px font-size-0.8em" :style="{
+            <v-btn class="bg-#333 font-size-0.8em" :style="{
               width: `${fontSize * 4.5}px`,
               height: `${fontSize * 2}px`,
             }" prepend-icon="touch_app" @mousedown=func.disperse.down @mouseup="func.disperse.up">
@@ -153,13 +155,14 @@ const func = {
 </template>
 
 <style scoped>
+.control-panel-leave-active,
+.control-panel-enter-active {
+  transition: opacity 200ms, transform 200ms;
+}
+
 .control-panel-enter-from,
 .control-panel-leave-to {
   opacity: 0;
-}
-
-.control-panel-enter-active,
-.control-panel-leave-active {
-  transition: opacity 200ms;
+  transform: translateY(20px) scale(0.3);
 }
 </style>

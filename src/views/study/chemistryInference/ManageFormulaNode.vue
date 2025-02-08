@@ -13,7 +13,7 @@ const toast = useToast()
 let lastCursorPos = new Vector()
 const draging = ref(false)
 function beginDrag(e: MouseEvent) {
-  document.documentElement.classList.add('pointer-events-none')
+  document.documentElement.classList.add('cursor-default')
   draging.value = true
   lastCursorPos = new Vector(e.clientX, e.clientY)
   window.addEventListener('mousemove', onDrag)
@@ -25,7 +25,7 @@ function onDrag(e: MouseEvent) {
   lastCursorPos = cursorPos
 }
 function overDrag() {
-  document.documentElement.classList.remove('pointer-events-none')
+  document.documentElement.classList.remove('cursor-default')
   draging.value = false
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', overDrag)
@@ -48,11 +48,13 @@ const inputFormula = ref<HTMLTextAreaElement | null>(null)
 const selection = ref<FormulaNode | null>(null)
 const formulaText = ref('')
 const descriptionText = ref('')
+const tagText = ref('')
 const invalid = ref(false)
 const currentFormula = ref<Formula | null>(null)
 const search = ref('')
-let focusOnFormula = ref(false)
-let focusOnDescription = ref(false)
+const focusOnFormula = ref(false)
+const focusOnDescription = ref(false)
+const focusOnTag = ref(false)
 const width = defineModel<number>('width', { default: 800 })
 const height = defineModel<number>('height', { default: 500 })
 const fontSize = computed(() => 16 + Math.min(width.value - 600, height.value - 400) * 0.03)
@@ -71,7 +73,6 @@ watch(display, () => {
 watch(formulaText, () => {
   try {
     const f = Formula.parse(formulaText.value)
-    f.description = descriptionText.value
     currentFormula.value = f
   } catch {
     currentFormula.value = null
@@ -86,7 +87,7 @@ onUnmounted(() => {
 })
 
 function windowkeydown(e: KeyboardEvent) {
-  if (!display.value || (!focusOnFormula.value && !focusOnDescription.value)) return
+  if (!display.value || (!focusOnFormula.value && !focusOnDescription.value && !focusOnTag.value)) return
   if (e.key === 'Escape') {
     e.preventDefault()
     display.value = false
@@ -107,6 +108,7 @@ function select(node: FormulaNode) {
     selection.value = node
     formulaText.value = node.formula.string()
     descriptionText.value = node.formula.description
+    tagText.value = node.formula.tag.join(' ')
   }
 }
 
@@ -120,6 +122,7 @@ function update() {
   try {
     const f = Formula.parse(formulaText.value)
     f.description = descriptionText.value
+    f.tag = tagText.value.split(' ').filter(t => t !== '')
     if (store.state.nodes.filter(n => n.formula.deepEqual(f)).length && !selection.value.formula.deepEqual(f)) {
       toast.dismiss('formula repeated')
       nextTick(() => toast.error('化学式重复', {
@@ -131,7 +134,7 @@ function update() {
       nextTick(() => toast.success('保存成功', {
         id: 'saved formula',
       }))
-      selection.value.formula.set(f)
+      selection.value.formula = f
       return true
     }
   } catch {
@@ -160,10 +163,12 @@ const act = {
   hide() {
     if (!selection.value) return
     selection.value.setStyle(NodeStyle.hidden)
+    selection.value.hidden = true
   },
   visualized() {
     if (!selection.value) return
     selection.value.setStyle(NodeStyle.normal)
+    selection.value.hidden = false
   },
 }
 
@@ -188,7 +193,7 @@ function onAddFormula(e: MouseEvent) {
           gridTemplateRows: `${fontSize * 1.5}px 1fr`
         }">
         <div class="bg-#303030 flex items-center flex-justify-end relative px-6px" @mousedown="beginDrag">
-          <h5 class="absolute full flex-center color-#ccc pointer-events-none">管理化学式</h5>
+          <h5 class="absolute full flex-center color-#ccc cursor-default pointer-events-none">管理化学式</h5>
           <span
             class="material-icons font-size-[1em_!important] color-#888 hover:color-#ccc transition-color cursor-pointer"
             @click="display = false" @mousedown="e => e.stopPropagation()">close</span>
@@ -250,19 +255,27 @@ function onAddFormula(e: MouseEvent) {
                         @focusout="focusOnFormula = false"></textarea>
                     </template>
                     <template #2>
-                      <Panel :gap="fontSize * 0.2">
+                      <Panel direction="vertical" :gap="fontSize * 0.2" :default-size="{ 2: fontSize * 2.3 }" :p2min="fontSize * 2.3">
                         <template #1>
-                          <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="descriptionText"
-                            placeholder="Markdown描述" @focus="focusOnDescription = true"
-                            @blur="focusOnDescription = false"></textarea>
+                          <Panel :gap="fontSize * 0.2">
+                            <template #1>
+                              <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="descriptionText"
+                                placeholder="Markdown描述" @focus="focusOnDescription = true"
+                                @blur="focusOnDescription = false"></textarea>
+                            </template>
+                            <template #2>
+                              <div
+                                class="full bg-#383838 font-size-1.2em rounded-6px absolute left-0 top-0 p-6px overflow-auto markdown"
+                                v-html="marked.parse(descriptionText)"></div>
+                            </template>
+                          </Panel>
                         </template>
                         <template #2>
-                          <div
-                            class="full bg-#383838 font-size-1.2em rounded-6px absolute left-0 top-0 p-6px overflow-auto markdown"
-                            v-html="marked.parse(descriptionText)"></div>
+                          <textarea class="full resize-none bg-#383838 rounded-6px p-6px" v-model="tagText"
+                            placeholder="标签" @focus="focusOnTag = true"
+                            @blur="focusOnTag = false"></textarea>
                         </template>
                       </Panel>
-
                     </template>
                   </Panel>
                 </template>
@@ -345,15 +358,14 @@ function onAddFormula(e: MouseEvent) {
 </template>
 
 <style lang="scss" scoped>
+.manage-formula-leave-active,
+.manage-formula-enter-active {
+  transition: opacity 200ms, transform 200ms;
+}
+
 .manage-formula-enter-from,
 .manage-formula-leave-to {
   opacity: 0;
-  transform: translateY(20px);
-}
-
-.manage-formula-enter-active,
-.manage-formula-leave-active {
-  transition-property: opacity, transform;
-  transition-duration: 200ms;
+  transform: translateY(20px) scale(0.3);
 }
 </style>

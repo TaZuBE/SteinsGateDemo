@@ -11,7 +11,6 @@ const toast = useToast()
 const store = useFormulaStore()
 
 
-const emit = defineEmits(['close'])
 const display = defineModel<boolean>('display', { required: true })
 const spos = defineModel<Vector>('pos', { required: true })
 const vpos = computed(() => store.toView(spos.value))
@@ -30,8 +29,10 @@ const fontSize = computed(() => 18 + Math.min(width.value - 480, height.value - 
 
 const formulaText = ref('')
 const descriptionText = ref('')
-const input1 = ref<HTMLTextAreaElement | null>(null)
-const input2 = ref<HTMLTextAreaElement | null>(null)
+const tagText = ref('')
+const inputFormula = ref<HTMLTextAreaElement | null>(null)
+const inputDescription = ref<HTMLTextAreaElement | null>(null)
+const inputTag = ref<HTMLTextAreaElement | null>(null)
 
 const formulaInfo = reactive({
   valid: {
@@ -57,13 +58,14 @@ const formulaInfo = reactive({
 })
 let invalid = ref(false)
 let lastEnterTime = -1
-let focusOnFormula = ref(false)
-let focusOnDescription = ref(false)
+const focusOnFormula = ref(false)
+const focusOnDescription = ref(false)
+const focusOnTag = ref(false)
 
 let lastCursorPos = new Vector()
 const draging = ref(false)
 function beginDrag(e: MouseEvent) {
-  document.documentElement.classList.add('pointer-events-none')
+  document.documentElement.classList.add('cursor-default')
   draging.value = true
   lastCursorPos = new Vector(e.clientX, e.clientY)
   window.addEventListener('mousemove', onDrag)
@@ -75,7 +77,7 @@ function onDrag(e: MouseEvent) {
   lastCursorPos = cursorPos
 }
 function overDrag() {
-  document.documentElement.classList.remove('pointer-events-none')
+  document.documentElement.classList.remove('cursor-default')
   draging.value = false
   window.removeEventListener('mousemove', onDrag)
   window.removeEventListener('mouseup', overDrag)
@@ -86,8 +88,8 @@ watch(display, () => {
     formulaText.value = ''
     descriptionText.value = ''
     nextTick(() => {
-      if (input1.value) {
-        input1.value.focus({ preventScroll: true })
+      if (inputFormula.value) {
+        inputFormula.value.focus({ preventScroll: true })
       }
     })
     window.addEventListener('keydown', windowkeydown)
@@ -125,7 +127,7 @@ function prettyPrint(str: string) {
 }
 
 function windowkeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && (focusOnFormula.value || focusOnDescription.value)) {
+  if (e.key === 'Escape' && (focusOnFormula.value || focusOnDescription.value || focusOnTag.value)) {
     display.value = false
   } else if (e.key === 'Enter' && focusOnFormula.value) {
     e.preventDefault()
@@ -152,6 +154,7 @@ function confirm() {
     toast.success('成功添加化学式')
     const f = Formula.parse(formulaText.value)
     f.description = descriptionText.value
+    f.tag = tagText.value.split(' ').filter(t => t !== '')
     store.addNode(new FormulaNode(f, store.toSpace(new Vector(100, 100))))
     display.value = false
   }
@@ -161,7 +164,7 @@ function confirm() {
 </script>
 
 <template>
-  <Transition name="t0">
+  <Transition name="add-formula">
     <ResizableWindow v-if="display" v-model:left="left" v-model:top="top" v-model:width="width" v-model:height="height"
       :min-width="480" :min-height="300" :scale="store.view.zoon.value * scale" :resizable="!draging">
       <div :class="invalid ? 'shake' : ''" class="full bg-#303030 shadow-[#222_0_1px_8px] grid select-none" :style="{
@@ -187,24 +190,36 @@ function confirm() {
               <Panel :gap="fontSize * 0.2" :default-size="{ 1: fontSize * 2 }" :p1min="fontSize * 2" :p2min="100"
                 direction="vertical">
                 <template #1>
-                  <textarea ref="input1" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
+                  <textarea ref="inputFormula" :class="{ 'border-[rgba(200,50,50,1)]': invalid }"
                     class="full bg-#383838 border-1 border-solid resize-none border-[rgba(200,50,50,0)] transition-border-color"
                     :style="{
                       padding: `${fontSize * 0.2}px`
-                    }" placeholder="化学式" v-model="formulaText" @focusin="focusOnFormula = true" @focusout="focusOnFormula = false"></textarea>
+                    }" placeholder="化学式" v-model="formulaText" @focusin="focusOnFormula = true"
+                    @focusout="focusOnFormula = false"></textarea>
                 </template>
                 <template #2>
-                  <Panel :gap="fontSize * 0.2">
+                  <Panel :gap="fontSize * 0.2" direction="vertical" :default-size="{ 2: fontSize * 2 }" :p2min="fontSize * 2">
                     <template #1>
-                      <textarea ref="input2" class="full bg-#383838 border-none resize-none outline-none" :style="{
-                        padding: `${fontSize * 0.2}px`
-                      }" placeholder="Markdown描述" v-model="descriptionText" @focusin="focusOnDescription = true" @focusout="focusOnDescription = false"></textarea>
+                      <Panel :gap="fontSize * 0.2">
+                        <template #1>
+                          <textarea ref="inputDescription" class="full bg-#383838 border-none resize-none outline-none" :style="{
+                            padding: `${fontSize * 0.2}px`
+                          }" placeholder="Markdown描述" v-model="descriptionText" @focusin="focusOnDescription = true"
+                            @focusout="focusOnDescription = false"></textarea>
+                        </template>
+                        <template #2>
+                          <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
+                            padding: `${fontSize * 0.2}px`
+                          }" v-html="marked.parse(descriptionText)">
+                          </div>
+                        </template>
+                      </Panel>
                     </template>
                     <template #2>
-                      <div class="full bg-#383838 rounded-6px absolute left-0 top-0 overflow-auto markdown" :style="{
-                        padding: `${fontSize * 0.2}px`
-                      }" v-html="marked.parse(descriptionText)">
-                      </div>
+                      <textarea ref="tagInput" class="full bg-#383838 border-none resize-none outline-none" :style="{
+                            padding: `${fontSize * 0.2}px`
+                          }" placeholder="标签" v-model="tagText" @focusin="focusOnTag = true"
+                            @focusout="focusOnTag = false"></textarea>
                     </template>
                   </Panel>
                 </template>
@@ -239,14 +254,14 @@ function confirm() {
 </template>
 
 <style lang="scss" scoped>
-.t0-enter-active,
-.t0-leave-active {
+.add-formula-leave-active,
+.add-formula-enter-active {
   transition: opacity 200ms, transform 200ms;
 }
 
-.t0-enter-from,
-.t0-leave-to {
-  transform: translateY(20px);
+.add-formula-enter-from,
+.add-formula-leave-to {
   opacity: 0;
+  transform: translateY(20px) scale(0.3);
 }
 </style>

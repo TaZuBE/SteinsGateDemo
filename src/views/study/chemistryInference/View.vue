@@ -11,7 +11,10 @@ import AddEquation from './AddEquation.vue'
 import ManageEquation from './ManageEquation.vue'
 import FunctionButton from './FunctionButton.vue'
 import ControlPanel from './ControlPanel.vue'
+import ResizableWindow from '@/components/ResizableWindow.vue'
 import Test from './test.vue'
+import type { ZoomIn } from '@material-ui/icons'
+import FilterTag from './FilterTag.vue'
 
 // store
 const store = useFormulaStore()
@@ -129,8 +132,6 @@ function lineStyle(a: FormulaNode, b: FormulaNode) {
     color: color
   }
 }
-const nodeMenu = ref<HTMLDivElement | null>(null)
-const viewMenu = ref<HTMLDivElement | null>(null)
 const CVS = {
   mousedown: {
     fPos: new Vector(),
@@ -161,6 +162,7 @@ const CVS = {
         window.removeEventListener('mouseup', view.onMouseup)
       },
       click() {
+        CVS.menu.hide()
         for (const n of store.state.nodes) {
           if (n.style.type === NodeStyle.shown || n.style.type !== NodeStyle.hidden) {
             n.setStyle(NodeStyle.normal)
@@ -173,6 +175,9 @@ const CVS = {
         CVS.mousedown.isClick = false
         targetNode.pos.doAdd(new Vector(e.clientX, e.clientY).sub(CVS.mousedown.fPos).div(store.view.zoon.value))
         CVS.mousedown.fPos = new Vector(e.clientX, e.clientY)
+        if (targetNode.pos.distance(CVS.menu.node.pos) > 100 && CVS.menu.node.on) {
+          CVS.menu.hide()
+        }
         Draw()
         store.repel()
       },
@@ -186,6 +191,7 @@ const CVS = {
         window.removeEventListener('mouseup', node.onMouseup)
       },
       click() {
+        CVS.menu.hide()
         for (const n of store.state.nodes) {
           if (n.style.type === NodeStyle.shown || n.style.type !== NodeStyle.hidden) {
             n.setStyle(NodeStyle.normal)
@@ -227,6 +233,12 @@ const CVS = {
           click() {
             const t = CVS.menu.node.target!
             t.setStyle(NodeStyle.hidden)
+            t.hidden = true
+            for (const n of store.state.nodes) {
+              if (n.style.type === NodeStyle.unselected) {
+                n.setStyle(NodeStyle.normal)
+              }
+            }
             CVS.menu.hide()
           }
         },
@@ -248,18 +260,28 @@ const CVS = {
         {
           text: '显示节点',
           sec: computed(() =>
-            store.state.nodes.filter(node => node.style.type === NodeStyle.hidden).map(n => ({
+            store.state.nodes.filter(node => node.hidden).map(n => ({
               text: n.formula.string(),
               click(e: MouseEvent) {
                 e.stopPropagation()
-                n.setStyle(NodeStyle.normal)
+                if (n.filtered) {
+                  n.setStyle(NodeStyle.normal)
+                }
+                n.hidden = false
+                store.repel()
               },
             }))
           ),
-          display: computed(() => store.state.nodes.filter(n => n.style.type === NodeStyle.hidden).length),
+          display: computed(() => store.state.nodes.filter(n => n.hidden).length),
           shortcut: 'V',
           click() {
-            store.state.nodes.forEach(n => n.setStyle(NodeStyle.normal))
+            store.state.nodes.forEach(n => {
+              if (n.filtered) {
+                n.setStyle(NodeStyle.normal)
+              }
+              n.hidden = false
+            })
+            store.repel()
             CVS.menu.hide()
           }
         },
@@ -267,18 +289,24 @@ const CVS = {
         {
           text: '隐藏节点',
           sec: computed(() =>
-            store.state.nodes.filter(node => node.style.type !== NodeStyle.hidden).map(n => ({
+            store.state.nodes.filter(node => !node.hidden).map(n => ({
               text: n.formula.string(),
               click(e: MouseEvent) {
                 e.stopPropagation()
-                n.setStyle(NodeStyle.hidden)
+                if (n.style.type !== NodeStyle.hidden) {
+                  n.setStyle(NodeStyle.hidden)
+                }
+                n.hidden = true
               },
             }))
           ),
-          display: computed(() => store.state.nodes.filter(n => n.style.type !== NodeStyle.hidden).length),
+          display: computed(() => store.state.nodes.filter(n => !n.hidden).length),
           shortcut: 'H',
           click() {
-            store.state.nodes.forEach(n => n.setStyle(NodeStyle.hidden))
+            store.state.nodes.forEach(n => {
+              n.setStyle(NodeStyle.hidden)
+              n.hidden = true
+            })
             CVS.menu.view.on = false
           }
         },
@@ -405,10 +433,32 @@ const CVS = {
             CVS.menu.hide()
           }
         },
+        // 8
+        {
+          text: '筛选标签',
+          shortcut: 'T',
+          extra: {
+            display: false,
+            pos: new Vector(),
+            width: 400,
+            height: 300,
+            scale: 1,
+            z: -5,
+          },
+          click() {
+            const ctx = CVS.menu.view.ctxs[8]
+            CVS.menu.view.setTopic(7)
+            const center = store.toSpace(new Vector(canvasCssSize.width / 2, canvasCssSize.height / 2))
+            ctx.extra.display = true
+            ctx.extra.scale = 1 / store.view.zoon.value
+            ctx.extra.pos = CVS.menu.view.on ? CVS.menu.view.pos.clone() : center.sub(new Vector(ctx.extra.width, ctx.extra.height).mul(0.5 * ctx.extra.scale))
+            CVS.menu.hide()
+          }
+        },
       ] as { text: string, extra?: any, sec?: { text: string, click: (payload: MouseEvent) => void }[], display?: boolean, shortcut?: string, update?: Function, click: (payload?: MouseEvent) => void }[],
       setTopic(index: number) {
         const ctx = CVS.menu.view.ctxs[index]
-        const window = [2, 3, 4, 5, 7]
+        const window = [2, 3, 4, 5, 7, 8]
         for (const i of window) {
           if (CVS.menu.view.ctxs[i].extra.z > ctx.extra.z) {
             CVS.menu.view.ctxs[i].extra.z--
@@ -443,13 +493,6 @@ const CVS = {
           n.setStyle(NodeStyle.unselected)
         }
       }
-      function mousedown(e: MouseEvent) {
-        if (!nodeMenu.value || !nodeMenu.value.contains(e.target as Node)) {
-          CVS.menu.hide()
-          window.removeEventListener('mousedown', mousedown)
-        }
-      }
-      window.addEventListener('mousedown', mousedown)
     } else {
       for (const ctx of CVS.menu.view.ctxs) {
         if (ctx.update) {
@@ -459,13 +502,6 @@ const CVS = {
       CVS.menu.view.on = true
       CVS.menu.view.pos.set(mouseSpace)
       CVS.menu.view.scale = 1 / store.view.zoon.value
-      function mousedown(e: MouseEvent) {
-        if (!viewMenu.value || !viewMenu.value.contains(e.target as Node)) {
-          CVS.menu.hide()
-          window.removeEventListener('mousedown', mousedown)
-        }
-      }
-      window.addEventListener('mousedown', mousedown)
     }
   },
 }
@@ -680,7 +716,7 @@ share(Draw)
     class="absolute left-0 top-0" @mousedown="CVS.onMousedown" @wheel="CVS.onWheel" @contextmenu.prevent="CVS.onMenu">
   </canvas>
 
-  <div ref="nodeMenu" class="menu-container node-menu-container z-999" :style="{
+  <div class="menu-container node-menu-container z-999" :style="{
     left: `${store.toView(CVS.menu.node.pos).x}px`,
     top: `${store.toView(CVS.menu.node.pos).y}px`,
     opacity: `${CVS.menu.node.on ? 100 : 0}%`,
@@ -706,7 +742,7 @@ share(Draw)
       </div>
     </div>
   </div>
-  <div ref="viewMenu" class="menu-container view-menu-container z-999" :style="{
+  <div class="menu-container view-menu-container z-999" :style="{
     left: `${store.toView(CVS.menu.view.pos).x}px`,
     top: `${store.toView(CVS.menu.view.pos).y}px`,
     opacity: `${CVS.menu.view.on ? 100 : 0}%`,
@@ -740,33 +776,39 @@ share(Draw)
     v-model:width="CVS.menu.view.ctxs[2].extra.width" v-model:height="CVS.menu.view.ctxs[2].extra.height"
     v-model:scale="CVS.menu.view.ctxs[2].extra.scale" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[2].extra.z
-    }" @mousedown="CVS.menu.view.setTopic(2)">
+    }" @mousedown="CVS.menu.view.setTopic(2); CVS.menu.hide()">
   </AddFormula>
   <ManageFormulaNode v-model:pos="CVS.menu.view.ctxs[3].extra.pos" v-model:display="CVS.menu.view.ctxs[3].extra.display"
     v-model:width="CVS.menu.view.ctxs[3].extra.width" v-model:height="CVS.menu.view.ctxs[3].extra.height"
     v-model:scale="CVS.menu.view.ctxs[3].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[3].extra.z
-    }" @mousedown="CVS.menu.view.setTopic(3)">
+    }" @mousedown="CVS.menu.view.setTopic(3); CVS.menu.hide()">
   </ManageFormulaNode>
 
   <AddEquation v-model:display="CVS.menu.view.ctxs[4].extra.display" :pos="CVS.menu.view.ctxs[4].extra.pos"
     v-model:width="CVS.menu.view.ctxs[4].extra.width" v-model:height="CVS.menu.view.ctxs[4].extra.height"
     v-model:scale="CVS.menu.view.ctxs[4].extra.scale" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[4].extra.z
-    }" @mousedown="CVS.menu.view.setTopic(4)">
+    }" @mousedown="CVS.menu.view.setTopic(4); CVS.menu.hide()">
   </AddEquation>
   <ManageEquation v-model:pos="CVS.menu.view.ctxs[5].extra.pos" v-model:display="CVS.menu.view.ctxs[5].extra.display"
     v-model:width="CVS.menu.view.ctxs[5].extra.width" v-model:height="CVS.menu.view.ctxs[5].extra.height"
     v-model:scale="CVS.menu.view.ctxs[5].extra.scale" v-model:ctxs="CVS.menu.view.ctxs" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[5].extra.z
-    }" @mousedown="CVS.menu.view.setTopic(5)">
+    }" @mousedown="CVS.menu.view.setTopic(5); CVS.menu.hide()">
   </ManageEquation>
 
   <ControlPanel v-model:pos="CVS.menu.view.ctxs[7].extra.pos" v-model:display="CVS.menu.view.ctxs[7].extra.display"
     v-model:width="CVS.menu.view.ctxs[7].extra.width" v-model:height="CVS.menu.view.ctxs[7].extra.height"
     :scale="CVS.menu.view.ctxs[7].extra.scale" :style="{
       zIndex: 10 + CVS.menu.view.ctxs[7].extra.z,
-    }" @mousedown="CVS.menu.view.setTopic(7)"></ControlPanel>
+    }" @mousedown="CVS.menu.view.setTopic(7); CVS.menu.hide()"></ControlPanel>
+
+  <FilterTag v-model:display="CVS.menu.view.ctxs[8].extra.display" v-model:pos="CVS.menu.view.ctxs[8].extra.pos"
+    v-model:width="CVS.menu.view.ctxs[8].extra.width" v-model:height="CVS.menu.view.ctxs[8].extra.height"
+    :scale="CVS.menu.view.ctxs[8].extra.scale" :style="{
+      zIndex: 10 + CVS.menu.view.ctxs[8].extra.z,
+    }" @mousedown="CVS.menu.view.setTopic(8); CVS.menu.hide()"></FilterTag>
 
   <FunctionButton></FunctionButton>
 
